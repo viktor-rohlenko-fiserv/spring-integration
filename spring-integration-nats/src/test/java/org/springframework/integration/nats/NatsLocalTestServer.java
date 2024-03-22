@@ -29,16 +29,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Class to run gnatds for tests. Highly based on the 1.0 client's NatsServer code.
  *
  * <p>This class will be removed once we move to testContainer approach
  *
  * <p>More info here: https://escmconfluence.1dc.com/display/IPG/NATS+-+Integration+Testing+Approach
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -46,6 +50,8 @@ import java.util.regex.Pattern;
  * all stakeholders and contact</a>
  */
 public class NatsLocalTestServer implements AutoCloseable {
+
+	private static final Log LOG = LogFactory.getLog(NatsLocalTestServer.class);
 
 	/* Default location of server installation (deployment type without docker).
 	 * This can be overwritten by e.g. using -Dnats_server_path={your local installation}
@@ -217,7 +223,7 @@ public class NatsLocalTestServer implements AutoCloseable {
 				}
 			}
 			catch (final Exception exp) {
-				System.out.println("%%% Error parsing config file for port.");
+				LOG.info("%%% Error parsing config file for port.");
 				return;
 			}
 			finally {
@@ -261,7 +267,7 @@ public class NatsLocalTestServer implements AutoCloseable {
 			final ProcessBuilder pb = new ProcessBuilder(cmd);
 
 			if (this.debug) {
-				System.out.println("%%% Starting [" + this.cmdLine + "] with redirected IO");
+				LOG.debug("%%% Starting [" + this.cmdLine + "] with redirected IO");
 				pb.inheritIO();
 			}
 			else {
@@ -293,13 +299,13 @@ public class NatsLocalTestServer implements AutoCloseable {
 				tries--;
 			} while (!this.process.isAlive() && tries > 0);
 
-			System.out.println("%%% Started [" + this.cmdLine + "]");
+			LOG.info("%%% Started [" + this.cmdLine + "]");
 		}
 		catch (final IOException ex) {
-			System.out.println("%%% Failed to start [" + this.cmdLine + "] with message:");
-			System.out.println("\t" + ex.getMessage());
-			System.out.println("%%% Make sure that the nats-server is installed and in your PATH.");
-			System.out.println(
+			LOG.error("%%% Failed to start [" + this.cmdLine + "] with message:");
+			LOG.error("\t" + ex.getMessage());
+			LOG.error("%%% Make sure that the nats-server is installed and in your PATH.");
+			LOG.error(
 					"%%% See https://github.com/nats-io/nats-server for information on installation");
 
 			throw new IllegalStateException("Failed to run [" + this.cmdLine + "]");
@@ -322,7 +328,7 @@ public class NatsLocalTestServer implements AutoCloseable {
 
 		this.process.destroy();
 
-		System.out.println("%%% Shut down [" + this.cmdLine + "]");
+		LOG.info("%%% Shut down [" + this.cmdLine + "]");
 
 		this.process = null;
 	}

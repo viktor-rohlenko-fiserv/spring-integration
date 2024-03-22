@@ -16,19 +16,18 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 
+import javax.annotation.PostConstruct;
+
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.assertj.core.api.Assertions;
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,10 +59,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NAT
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -134,8 +134,8 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 		// publish valid messages to subject via natsTemplateString
 		for (int i = 0; i < 2; i++) {
 			final PublishAck ack = natsTemplateString.send("Hello" + i);
-			assertNotNull(ack);
-			assertEquals(TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(TEST_STREAM, ack.getStream());
 		}
 		// Publish invalid message via natsTemplate
 		natsTemplateTestStub.send(new TestStub("error"));
@@ -143,25 +143,25 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 		// publish some more valid messages to subject via natsTemplateString
 		for (int i = 2; i < 4; i++) {
 			final PublishAck ack = natsTemplateString.send("Hello" + i);
-			assertNotNull(ack);
-			assertEquals(TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(TEST_STREAM, ack.getStream());
 		}
 
 		// Message consumer -> check for valid messages in consumer channel
 		for (int i = 0; i < 4; i++) {
 			final Message<?> message = this.consumerChannel.receive(20000);
-			assertNotNull(message);
-			assertEquals("Hello" + i, message.getPayload());
+			Assert.assertNotNull(message);
+			Assert.assertEquals("Hello" + i, message.getPayload());
 		}
 
 		// Message consumer -> check for information about invalid messages in
 		// error channel
 		Message<?> errorMessage = this.errorChannel.receive(20000);
-		assertNotNull(errorMessage);
-		assertEquals(MessageConversionException.class, errorMessage.getPayload().getClass());
+		Assert.assertNotNull(errorMessage);
+		Assert.assertEquals(MessageConversionException.class, errorMessage.getPayload().getClass());
 		final MessageConversionException conversionException =
 				(MessageConversionException) errorMessage.getPayload();
-		assertTrue(conversionException.getMessage().contains("Error converting to java.lang.String"));
+		Assert.assertTrue(conversionException.getMessage().contains("Error converting to java.lang.String"));
 
 		// Message Producer: Publish new messages to topic via
 		// natsTemplateString
@@ -171,11 +171,11 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 
 		// Message consumer -> check for valid messages in consumer channel
 		Message<?> message = this.consumerChannel.receive(20000);
-		assertThat(message).isNotNull();
-		assertThat(message.getPayload()).isEqualTo("Hello" + "still running1");
+		Assertions.assertThat(message).isNotNull();
+		Assertions.assertThat(message.getPayload()).isEqualTo("Hello" + "still running1");
 		message = this.consumerChannel.receive(20000);
-		assertThat(message).isNotNull();
-		assertThat(message.getPayload()).isEqualTo("Hello" + "still running2");
+		Assertions.assertThat(message).isNotNull();
+		Assertions.assertThat(message.getPayload()).isEqualTo("Hello" + "still running2");
 
 		// Scenario: Exception in transformer method
 
@@ -184,18 +184,18 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 		// On this particular message transformer will throw Exception
 		// See negativeFlow bean below
 		final PublishAck ack = natsTemplateString.send("message_tranformation_error");
-		assertNotNull(ack);
-		assertEquals(TEST_STREAM, ack.getStream());
+		Assert.assertNotNull(ack);
+		Assert.assertEquals(TEST_STREAM, ack.getStream());
 
 		// Message consumer -> check for information about invalid messages in
 		// error channel
 		errorMessage = this.errorChannel.receive(20000);
-		assertNotNull(errorMessage);
-		assertEquals(errorMessage.getPayload().getClass(), MessageTransformationException.class);
+		Assert.assertNotNull(errorMessage);
+		Assert.assertEquals(errorMessage.getPayload().getClass(), MessageTransformationException.class);
 		final MessageTransformationException transformException =
 				(MessageTransformationException) errorMessage.getPayload();
-		assertTrue(transformException.getMessage().contains("Failed to transform Message in bean"));
-		assertEquals(
+		Assert.assertTrue(transformException.getMessage().contains("Failed to transform Message in bean"));
+		Assert.assertEquals(
 				"intentional Runtime Exception in transformer",
 				transformException.getCause().getCause().getMessage());
 
@@ -207,11 +207,11 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 
 		// Message consumer -> check for valid messages in consumer channel
 		message = this.consumerChannel.receive(20000);
-		assertThat(message).isNotNull();
-		assertThat(message.getPayload()).isEqualTo("Hello" + "still running3");
+		Assertions.assertThat(message).isNotNull();
+		Assertions.assertThat(message.getPayload()).isEqualTo("Hello" + "still running3");
 		message = this.consumerChannel.receive(20000);
-		assertThat(message).isNotNull();
-		assertThat(message.getPayload()).isEqualTo("Hello" + "still running4");
+		Assertions.assertThat(message).isNotNull();
+		Assertions.assertThat(message.getPayload()).isEqualTo("Hello" + "still running4");
 	}
 
 	/**
@@ -305,7 +305,7 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 
 		private final String property;
 
-		public TestStub(final String propertyValue) {
+		TestStub(final String propertyValue) {
 			this.property = propertyValue;
 		}
 

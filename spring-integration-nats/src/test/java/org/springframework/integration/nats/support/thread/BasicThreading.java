@@ -22,13 +22,17 @@ import java.util.Timer;
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
  * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
  * all stakeholders and contact</a>
  */
-public class BasicThreading {
+public final class BasicThreading {
+
+	private BasicThreading() {
+	}
 
 	public static void wait(int millis, String name) throws InterruptedException {
 		Timer t = new Timer();

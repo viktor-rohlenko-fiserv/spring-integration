@@ -16,15 +16,17 @@
 
 package org.springframework.integration.nats;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import java.io.IOException;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
-
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -48,19 +50,16 @@ import org.springframework.stereotype.Repository;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.io.IOException;
-
-import javax.annotation.PostConstruct;
-
 /**
  * Tests the flow using Producer and Consumer bean configuration without DSL
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NAT
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -139,8 +138,8 @@ public class NatsMessageVersioningDeletedFieldTest extends AbstractNatsIntegrati
 			// sending DTO of Version 1 which can be considered the version with deleted field
 			final TestDTOStubV1 dtoStub = new TestDTOStubV1("Hello" + i);
 			final PublishAck ack = natsTemplate.send(dtoStub);
-			assertNotNull(ack);
-			assertEquals(GeneralContextConfig.TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(GeneralContextConfig.TEST_STREAM, ack.getStream());
 		}
 
 		// Message Consumer Assertion -> Messages consumed via adapter should be
@@ -150,14 +149,14 @@ public class NatsMessageVersioningDeletedFieldTest extends AbstractNatsIntegrati
 		// in spite of the fact JSON contains unknown properties.
 		for (int i = 0; i < 5; i++) {
 			final Message<?> message = this.consumerChannel.receive(20000);
-			assertNotNull(message);
+			Assert.assertNotNull(message);
 			// receiving and converting to the version 2 without impact. The new field of version 2 will
 			// not be initialized.
 			// this means that consumer should care about the field which has not been initialized.
 			// The basic problem remains and will be delegated to business logic of consumer. But
 			// Framework remains stable.
 			final TestDTOStubV2 payload = (TestDTOStubV2) message.getPayload();
-			assertEquals("Hello" + i, payload.getProperty());
+			Assert.assertEquals("Hello" + i, payload.getProperty());
 		}
 	}
 

@@ -22,22 +22,24 @@ import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
 import io.nats.client.impl.Headers;
 import org.junit.Test;
+
+import org.springframework.integration.nats.util.NatsUtils;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.springframework.integration.nats.util.NatsUtils;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.support.MessageBuilder;
-
 /**
  * Unit test cases for the NatsMessageProducingHandler class.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a

@@ -16,9 +16,10 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
@@ -28,7 +29,6 @@ import io.nats.spring.boot.autoconfigure.NatsConnectionProperties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Assert;
-import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -58,6 +58,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -106,7 +107,7 @@ public class NatsOutputQueueTest extends AbstractNatsIntegrationTestSupport {
 		}
 		catch (Exception ex) {
 			// This is the expected behavior of NATS client when internal output queue overflows
-			assertTrue(ex.getMessage().contains("Output queue is full"));
+			Assert.assertTrue(ex.getMessage().contains("Output queue is full"));
 		}
 	}
 

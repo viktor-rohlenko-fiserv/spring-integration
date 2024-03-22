@@ -16,7 +16,6 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
@@ -33,10 +34,8 @@ import io.nats.client.impl.NatsJetStreamMetaData;
 import io.nats.client.impl.NatsMessage;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import org.junit.Assert;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,10 +64,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NAT
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -141,8 +141,8 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 		// publish valid messages to subject via natsTemplateString
 		for (int i = 0; i < 5; i++) {
 			final PublishAck ack = natsTemplateString.send("Hello" + i);
-			assertNotNull(ack);
-			Assertions.assertEquals(TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(TEST_STREAM, ack.getStream());
 		}
 
 		// Wait till message redelivery happens
@@ -158,7 +158,7 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 			if (!s.startsWith("do-not-acknowledge")) {
 				// assert that for all other messages, they are delivered once
 				LOG.info("Message received: " + s + " => " + natsJetStreamMetaData);
-				assertEquals(1, natsJetStreamMetaData.deliveredCount());
+				Assert.assertEquals(1, natsJetStreamMetaData.deliveredCount());
 			}
 		}
 
@@ -170,7 +170,7 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 			if (s.startsWith("do-not-acknowledge")) {
 				// assert that "do-not-acknowledge" message is redelivered
 				LOG.info("Message received: " + s + " => " + natsJetStreamMetaData);
-				assertEquals(3, natsJetStreamMetaData.deliveredCount());
+				Assert.assertEquals(3, natsJetStreamMetaData.deliveredCount());
 			}
 		}
 	}
@@ -205,8 +205,8 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 		// publish some other messages to subject via natsTemplateString
 		for (int i = 0; i < 5; i++) {
 			final PublishAck ack = natsTemplateString.send("Hello" + i);
-			assertNotNull(ack);
-			Assertions.assertEquals(TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(TEST_STREAM, ack.getStream());
 		}
 
 		// Publish specific message via natsTemplate - this message will be take time to process
@@ -225,7 +225,7 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 			if (!s.startsWith("do-not-acknowledge")) {
 				// assert that for all other messages, they are delivered once
 				LOG.info("Message received: " + s + " => " + natsJetStreamMetaData);
-				assertEquals(1, natsJetStreamMetaData.deliveredCount());
+				Assert.assertEquals(1, natsJetStreamMetaData.deliveredCount());
 			}
 		}
 

@@ -16,15 +16,18 @@
 
 package org.springframework.integration.nats.math;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
 /**
  * Unit Test for Equations Utility function
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -32,6 +35,8 @@ import org.junit.jupiter.api.Test;
  *     all stakeholders and contact</a>
  */
 public class EquationsTest {
+
+	private static final Log LOG = LogFactory.getLog(EquationsTest.class);
 
 	/**
 	 * Verifies the binary based implementation of the equations method which returns increasing f(x)
@@ -49,7 +54,7 @@ public class EquationsTest {
 		int threshold = 75;
 		for (int x = 0; x <= 100; x = x + granularity) {
 			int y = Equations.binaryBased(x, threshold, granularity);
-			System.out.println("f(" + x + ")= " + y);
+			LOG.info("f(" + x + ")= " + y);
 			Assert.assertEquals(expected[i], y);
 			i++;
 		}
@@ -67,9 +72,9 @@ public class EquationsTest {
 		int threshold = 75;
 		for (int x = 0; x <= total; x = x + 10) {
 			double y = Equations.percentage(x, total);
-			System.out.println("y(" + x + ")= " + y);
+			LOG.info("y(" + x + ")= " + y);
 			int z = Equations.binaryBased(y, threshold, granularity);
-			System.out.println("z(" + x + ")= " + z);
+			LOG.info("z(" + x + ")= " + z);
 			if (range(y, 0, 75)) {
 				Assert.assertEquals(0, z);
 			}
