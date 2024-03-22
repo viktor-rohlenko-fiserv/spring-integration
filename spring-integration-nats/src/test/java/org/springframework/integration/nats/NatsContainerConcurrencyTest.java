@@ -27,10 +27,9 @@ import io.nats.client.JetStreamApiException;
 import io.nats.client.Message;
 import io.nats.client.impl.NatsJetStreamSubscription;
 import io.nats.client.impl.NatsMessage;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Test;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -93,16 +92,16 @@ public class NatsContainerConcurrencyTest {
 		final NatsMessageDrivenChannelAdapter adapter = new NatsMessageDrivenChannelAdapter(container);
 		adapter.setBeanName("test-adapter");
 		// Assert that adapter and container is not running before start
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// Initialize and start adapter
 		adapter.onInit();
 		adapter.start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapter.isRunning());
-		assertTrue(container.isRunning());
+		Assert.assertTrue(adapter.isRunning());
+		Assert.assertTrue(container.isRunning());
 		// check if concurrent child container is started and running
-		container.getContainers().forEach((childContainer) -> assertTrue(childContainer.isRunning()));
+		container.getContainers().forEach((childContainer) -> Assert.assertTrue(childContainer.isRunning()));
 		// Check if one thread is created with name specified - default
 		// concurrency is 1
 		final Set<Thread> tSet = Thread.getAllStackTraces().keySet();
@@ -112,21 +111,21 @@ public class NatsContainerConcurrencyTest {
 				tSet.stream()
 						.filter(t -> (TEST_CONTAINER + "-0-nats-C-1").equalsIgnoreCase(t.getName()))
 						.findFirst();
-		assertTrue(optionalThread.isPresent());
+		Assert.assertTrue(optionalThread.isPresent());
 		final Thread thread = optionalThread.get();
 		// check if the thread is alive
-		assertTrue(thread.isAlive());
+		Assert.assertTrue(thread.isAlive());
 		// stop the adapter
 		adapter.stop();
 		// Assert that adapter and container is not running after stop
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// check if concurrent child container is stopped as well
-		container.getContainers().forEach((childContainer) -> assertTrue(childContainer.isRunning()));
+		container.getContainers().forEach((childContainer) -> Assert.assertTrue(childContainer.isRunning()));
 		// check if the thread is stopped after container stop, wait for few
 		// seconds
 		Thread.sleep(2000);
-		assertFalse(thread.isAlive());
+		Assert.assertFalse(thread.isAlive());
 	}
 
 	/**
@@ -159,35 +158,35 @@ public class NatsContainerConcurrencyTest {
 		final NatsMessageDrivenChannelAdapter adapter = new NatsMessageDrivenChannelAdapter(container);
 		adapter.setBeanName("concur-adapter");
 		// Assert that adapter and container is not running before start
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// Initialize and start adapter
 		adapter.onInit();
 		adapter.start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapter.isRunning());
-		assertTrue(container.isRunning());
+		Assert.assertTrue(adapter.isRunning());
+		Assert.assertTrue(container.isRunning());
 		// check if concurrent containers are started and running
-		container.getContainers().forEach((childContainer) -> assertTrue(childContainer.isRunning()));
+		container.getContainers().forEach((childContainer) -> Assert.assertTrue(childContainer.isRunning()));
 		// Check if the thread is created with name specified
 		final Set<Thread> tSet = Thread.getAllStackTraces().keySet();
 		final List<Thread> threadsCreated =
 				tSet.stream()
 						.filter(t -> t.getName().contains(CONCURRENT_CONTAINER))
 						.collect(Collectors.toList());
-		assertEquals(3, threadsCreated.size());
+		Assert.assertEquals(3, threadsCreated.size());
 		// check if the thread is alive
-		threadsCreated.forEach((thread) -> assertTrue(thread.isAlive()));
+		threadsCreated.forEach((thread) -> Assert.assertTrue(thread.isAlive()));
 		// stop the adapter
 		adapter.stop();
 		// Assert that adapter and container is not running after stop
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// check if concurrent child containers are stopped as well
-		container.getContainers().forEach((childContainer) -> assertFalse(childContainer.isRunning()));
+		container.getContainers().forEach((childContainer) -> Assert.assertFalse(childContainer.isRunning()));
 		// check if the thread is stopped after container stop, wait for few
 		// seconds
 		Thread.sleep(2000);
-		threadsCreated.forEach((thread) -> assertFalse(thread.isAlive()));
+		threadsCreated.forEach((thread) -> Assert.assertFalse(thread.isAlive()));
 	}
 }

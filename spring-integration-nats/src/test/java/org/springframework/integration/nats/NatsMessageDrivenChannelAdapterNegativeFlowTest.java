@@ -19,11 +19,8 @@ package org.springframework.integration.nats;
 import java.io.IOException;
 
 import io.nats.client.Connection;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,10 +37,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * <p>Manual test cases to test NATS spring components communication with NATS server.
  *
  * <p>Prerequisite: set below properties and then start the test. -Dnats_js_enabled=false
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -80,22 +78,22 @@ public class NatsMessageDrivenChannelAdapterNegativeFlowTest
 				adapter.new NatsMessageHandler();
 		container.setMessageHandler(messageHandler);
 		// Assert that adapter and container is not running before start
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// Check if NATS exception is thrown with expected message
-		final NatsException exception = assertThrows(NatsException.class, () -> container.start());
-		assertEquals(IOException.class, exception.getCause().getClass());
-		assertTrue(
+		final NatsException exception = Assert.assertThrows(NatsException.class, () -> container.start());
+		Assert.assertEquals(IOException.class, exception.getCause().getClass());
+		Assert.assertTrue(
 				exception
 						.getMessage()
 						.contains("Subscription is not available to start the container for subject:"));
 		final IOException nestedException = (IOException) exception.getCause();
-		assertTrue(
+		Assert.assertTrue(
 				nestedException
 						.getMessage()
 						.contains("Timeout or no response waiting for NATS JetStream server"));
 		// Assert that adapter and container is not running after start
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 	}
 }

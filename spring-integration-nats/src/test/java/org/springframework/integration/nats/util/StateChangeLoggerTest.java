@@ -25,6 +25,7 @@ import org.springframework.integration.nats.math.Equations;
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -54,7 +55,9 @@ public class StateChangeLoggerTest {
 								String.format(
 										"NATS AckQueue of Spring Integration Framework reached occupancy=%,.2f%% of capacity!. Slowdown to the factor=%d",
 										occupancy, factor));
-				if (isChanged) logCounter++;
+				if (isChanged) {
+					logCounter++;
+				}
 			}
 		}
 
@@ -68,7 +71,9 @@ public class StateChangeLoggerTest {
 								String.format(
 										"NATS AckQueue of Spring Integration Framework reached occupancy=%,.2f%% of capacity!. Slowdown to the factor=%d",
 										occupancy, factor));
-				if (isChanged) logCounter++;
+				if (isChanged) {
+					logCounter++;
+				}
 			}
 		}
 		Assert.assertEquals(6 * 2, logCounter);

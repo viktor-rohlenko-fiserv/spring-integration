@@ -16,14 +16,14 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -54,10 +54,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NAT
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -136,8 +137,8 @@ public class NatsMessageVersioningAddedFieldTest extends AbstractNatsIntegration
 			// sending DTO of Version 2
 			final PublishAck ack =
 					natsTemplate.send(new TestDTOStubV2("Hello" + i, "I am new unknown property"));
-			assertNotNull(ack);
-			assertEquals(GeneralContextConfig.TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(GeneralContextConfig.TEST_STREAM, ack.getStream());
 		}
 
 		// Message Consumer Assertion -> Messages consumed via adapter should be
@@ -147,11 +148,11 @@ public class NatsMessageVersioningAddedFieldTest extends AbstractNatsIntegration
 		// in spite of the fact JSON contains unknown properties.
 		for (int i = 0; i < 5; i++) {
 			final Message<?> message = this.consumerChannel.receive(20000);
-			assertNotNull(message);
+			Assert.assertNotNull(message);
 			// receiving and converting to the version 1 without impact. The new field of version 2 is
 			// ignored
 			final TestDTOStubV1 payload = (TestDTOStubV1) message.getPayload();
-			assertEquals("Hello" + i, payload.getProperty());
+			Assert.assertEquals("Hello" + i, payload.getProperty());
 		}
 	}
 

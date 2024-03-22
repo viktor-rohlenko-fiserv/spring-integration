@@ -16,17 +16,17 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.assertj.core.api.Assertions;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -59,10 +59,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NATS
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -118,38 +119,38 @@ public class NatsDSLConfigTest extends AbstractNatsIntegrationTestSupport {
 		final NatsConcurrentListenerContainer concurrentContainer =
 				(NatsConcurrentListenerContainer) this.appContext.getBean("testContainerPushMode");
 		// Check if Adapter and Container is not running when not started
-		assertFalse(adapter.isRunning());
-		assertFalse(concurrentContainer.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(concurrentContainer.isRunning());
 		// start adapter using messaging gateway
 		this.controlBus.send("@testAdapterPushMode.start()");
 		// Test Adapter and Container running after start
-		assertTrue(adapter.isRunning());
-		assertTrue(concurrentContainer.isRunning());
+		Assert.assertTrue(adapter.isRunning());
+		Assert.assertTrue(concurrentContainer.isRunning());
 		// since concurrency is one, we know only one container is present
 		final NatsMessageListenerContainer container = concurrentContainer.getContainers().get(0);
-		assertTrue(container.isRunning());
+		Assert.assertTrue(container.isRunning());
 
 		// Message Producer -> Publishes 5 messages to NATS server via
 		// producerChannel
 		for (int i = 0; i < 5; i++) {
 			final boolean messageSent =
 					this.producerChannel.send(MessageBuilder.withPayload("Hello" + i).build());
-			assertTrue(messageSent);
+			Assert.assertTrue(messageSent);
 		}
 
 		// Message Consumer -> Consumed message from NATS server should be
 		// available in Adapter's output channel(consumerChannel)
 		for (int i = 0; i < 5; i++) {
 			final Message<?> message = this.consumerChannel.receive(20000);
-			assertThat(message).isNotNull();
-			assertThat(message.getPayload()).isEqualTo("Hello" + i);
+			Assertions.assertThat(message).isNotNull();
+			Assertions.assertThat(message.getPayload()).isEqualTo("Hello" + i);
 		}
 
 		// Stop adapter
 		this.controlBus.send("@testAdapterPushMode.stop()");
 		// Check if Adapter and Container is stopped
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 	}
 
 	/**
@@ -202,8 +203,7 @@ public class NatsDSLConfigTest extends AbstractNatsIntegrationTestSupport {
 							Nats.messageDrivenChannelAdapter(
 											Nats.container(testConsumerFactory(), NatsMessageDeliveryMode.PULL) //
 													.id("testContainerPushMode") //
-													.concurrency(1) //
-											,
+													.concurrency(1),
 											messageConvertor())
 									.id("testAdapterPushMode") //
 									.autoStartup(false)

@@ -26,20 +26,22 @@ import io.nats.client.api.PublishAck;
 import io.nats.client.impl.Headers;
 import org.junit.Assert;
 import org.junit.Test;
+
+import org.springframework.integration.nats.converter.MessageConverter;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.springframework.integration.nats.converter.MessageConverter;
-
 /**
  * Unit test cases for the NatsTemplate class.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a

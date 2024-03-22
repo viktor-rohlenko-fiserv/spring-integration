@@ -12,28 +12,20 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * @author Viktor Rohlenko
- * @author Vennila Pazhamalai
- * @author Vivek Duraisamy
- * @since 6.4.x
- *
- * @see <a
- * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
- * all stakeholders and contact</a>
  */
+
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.Collection;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
 import io.nats.client.impl.NatsMessage;
 import org.junit.Assert;
-import static org.junit.Assert.assertNotNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -70,6 +62,16 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * workflow. Manuel acknowledgment provides the ability to manage acknowledgment based on the
  * workflow implementation details and provides big flexibility depending on the business
  * requirements.
+ *
+ * @author Viktor Rohlenko
+ * @author Vennila Pazhamalai
+ * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
+ * @since 6.4.x
+ *
+ * @see <a
+ * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
+ * all stakeholders and contact</a>
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(
@@ -106,7 +108,7 @@ public class NatsSpringIntegrationScatterGatherTest extends AbstractNatsIntegrat
 		// using NATS
 		for (int i = 0; i < 100; i++) {
 			final PublishAck ack = natsTemplateString.send("Hello" + i);
-			assertNotNull(ack);
+			Assert.assertNotNull(ack);
 		}
 		BasicThreading.wait(
 				10000, "Await in main thread to give a chance the workflow thread to receive a messages");
@@ -245,9 +247,10 @@ public class NatsSpringIntegrationScatterGatherTest extends AbstractNatsIntegrat
 				else if (message.getPayload() instanceof SimulatorNotificationRQ) {
 					rq = (SimulatorNotificationRQ) message.getPayload();
 				}
-				else
+				else {
 					Assert.fail(
 							"Messages are not in expected types of NatsMessage and SimulatorNotificationRQ!");
+				}
 			}
 			if (rq == null || natsMessage == null) {
 				Assert.fail("All returned messages from subFlows has to be initialised!");

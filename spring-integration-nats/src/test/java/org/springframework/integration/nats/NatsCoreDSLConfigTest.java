@@ -21,8 +21,8 @@ import java.util.concurrent.Executors;
 import io.nats.client.Connection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertTrue;
+import org.assertj.core.api.Assertions;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -53,10 +53,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NATS
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -126,7 +127,7 @@ public class NatsCoreDSLConfigTest extends AbstractNatsIntegrationTestSupport {
 		for (int i = 0; i < 2; i++) {
 			final boolean messageSent =
 					this.producerChannel.send(MessageBuilder.withPayload("Hello" + i).build());
-			assertTrue(messageSent);
+			Assert.assertTrue(messageSent);
 		}
 
 		try {
@@ -141,7 +142,7 @@ public class NatsCoreDSLConfigTest extends AbstractNatsIntegrationTestSupport {
 			final Message<?> message = this.consumerChannel.receive(2000);
 			if (message != null) {
 				LOG.info("Rec Message: " + message.getPayload());
-				assertThat(message).isNotNull();
+				Assertions.assertThat(message).isNotNull();
 			}
 		}
 	}

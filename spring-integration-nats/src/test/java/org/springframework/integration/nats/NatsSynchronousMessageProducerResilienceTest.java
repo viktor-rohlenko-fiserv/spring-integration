@@ -16,10 +16,11 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
@@ -73,6 +74,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a

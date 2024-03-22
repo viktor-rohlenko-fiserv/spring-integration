@@ -16,18 +16,17 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,10 +60,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NATS
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -114,7 +114,7 @@ public class NatsOutboundAdapterTest extends AbstractNatsIntegrationTestSupport 
 		LOG.info(this.natsConnection.getConnectedUrl());
 		// Test if messages are sent to NATs server
 		for (int i = 0; i < 5; i++) {
-			assertTrue(
+			Assert.assertTrue(
 					this.producerChannelPositiveFlow.send(MessageBuilder.withPayload("Hello").build()));
 		}
 	}
@@ -134,12 +134,12 @@ public class NatsOutboundAdapterTest extends AbstractNatsIntegrationTestSupport 
 		LOG.info(this.natsConnection.getConnectedUrl());
 		// Test if exception is thrown when message is sent to invalid subject(topic)
 		MessageDeliveryException messageDeliveryException =
-				assertThrows(
+				Assert.assertThrows(
 						MessageDeliveryException.class,
 						() ->
 								this.producerChannelNegativeFlow.send(MessageBuilder.withPayload("Hello").build()));
-		assertEquals(IOException.class, messageDeliveryException.getCause().getClass());
-		assertTrue(
+		Assert.assertEquals(IOException.class, messageDeliveryException.getCause().getClass());
+		Assert.assertTrue(
 				messageDeliveryException
 						.getMessage()
 						.contains("Exception occurred while sending message to invalid_subject"));
@@ -160,13 +160,13 @@ public class NatsOutboundAdapterTest extends AbstractNatsIntegrationTestSupport 
 		LOG.info(this.natsConnection.getConnectedUrl());
 		// Test if exception is thrown when message conversion failure happens
 		MessageHandlingException messageHandlingException =
-				assertThrows(
+				Assert.assertThrows(
 						MessageHandlingException.class,
 						() ->
 								this.producerChannelMessageConversionError.send(
 										MessageBuilder.withPayload(new TestStub("errorMessage")).build()));
-		assertEquals(MessageConversionException.class, messageHandlingException.getCause().getClass());
-		assertTrue(
+		Assert.assertEquals(MessageConversionException.class, messageHandlingException.getCause().getClass());
+		Assert.assertTrue(
 				messageHandlingException
 						.getMessage()
 						.contains(

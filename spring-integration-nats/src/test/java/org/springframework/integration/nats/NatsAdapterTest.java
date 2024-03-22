@@ -19,17 +19,9 @@ package org.springframework.integration.nats;
 import java.io.Serializable;
 
 import io.nats.client.impl.NatsMessage;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.assertj.core.api.Assertions;
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.MessageChannels;
@@ -39,12 +31,19 @@ import org.springframework.integration.nats.exception.MessageConversionException
 import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.PollableChannel;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 /**
  * Unit testing of NatsMessageDrivenChannelAdapter
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -62,19 +61,19 @@ public class NatsAdapterTest {
 		final NatsMessageListenerContainer container = mock(NatsMessageListenerContainer.class);
 		final NatsMessageDrivenChannelAdapter adapter = new NatsMessageDrivenChannelAdapter(container);
 		// Assert that adapter and container is not running before start
-		assertFalse(adapter.isRunning());
+		Assert.assertFalse(adapter.isRunning());
 		verify(container, times(1)).setAutoStartup(false);
 		adapter.onInit();
 		adapter.start();
 		verify(container, times(1)).setMessageHandler(any());
 		verify(container, times(1)).start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapter.isRunning());
+		Assert.assertTrue(adapter.isRunning());
 		// assertTrue(container.isRunning());
 		adapter.stop();
 		verify(container, times(1)).stop();
 		// Assert that adapter and container is not running after stop
-		assertFalse(adapter.isRunning());
+		Assert.assertFalse(adapter.isRunning());
 	}
 
 	/** Test successful execution on onMessage method in {@link NatsMessageHandler} */
@@ -98,8 +97,8 @@ public class NatsAdapterTest {
 		messageHandler.onMessage(natsMessage);
 		// Assert that message is received in consumer channel
 		final org.springframework.messaging.Message<?> message = consumerChannel.receive(20000);
-		assertThat(message).isNotNull();
-		assertThat(message.getPayload()).isEqualTo("Testing");
+		Assertions.assertThat(message).isNotNull();
+		Assertions.assertThat(message.getPayload()).isEqualTo("Testing");
 	}
 
 	/**
@@ -132,11 +131,11 @@ public class NatsAdapterTest {
 		// Error channel should receive the error info about message conversion
 		// exception
 		final org.springframework.messaging.Message<?> errorMessage = errorChannel.receive(20000);
-		assertNotNull(errorMessage);
-		assertEquals(MessageConversionException.class, errorMessage.getPayload().getClass());
+		Assert.assertNotNull(errorMessage);
+		Assert.assertEquals(MessageConversionException.class, errorMessage.getPayload().getClass());
 		final MessageConversionException conversionException =
 				(MessageConversionException) errorMessage.getPayload();
-		assertTrue(conversionException.getMessage().contains("Error converting to java.lang.String"));
+		Assert.assertTrue(conversionException.getMessage().contains("Error converting to java.lang.String"));
 	}
 
 	/**
@@ -167,7 +166,7 @@ public class NatsAdapterTest {
 								throw new IllegalStateException("transform_error_message");
 							}
 						});
-		assertTrue(messageProcessing);
+		Assert.assertTrue(messageProcessing);
 		// configure error prone NATS message
 		final NatsMessage natsMessage = mock(NatsMessage.class);
 		when(natsMessage.getData()).thenReturn(messageConverterString.toMessage("transformError"));
@@ -177,10 +176,10 @@ public class NatsAdapterTest {
 		// Error channel should receive the error info about processing and
 		// delivery exception
 		final org.springframework.messaging.Message<?> errorMessage = errorChannel.receive(20000);
-		assertNotNull(errorMessage);
-		assertEquals(MessageDeliveryException.class, errorMessage.getPayload().getClass());
+		Assert.assertNotNull(errorMessage);
+		Assert.assertEquals(MessageDeliveryException.class, errorMessage.getPayload().getClass());
 		final MessageDeliveryException exception = (MessageDeliveryException) errorMessage.getPayload();
-		assertTrue(exception.getMessage().contains("transform_error_message"));
+		Assert.assertTrue(exception.getMessage().contains("transform_error_message"));
 	}
 
 	/** Test class to produce invalid messages in different format for message conversion test */
@@ -190,7 +189,7 @@ public class NatsAdapterTest {
 
 		private final String property;
 
-		public TestStub(final String propertyValue) {
+		TestStub(final String propertyValue) {
 			this.property = propertyValue;
 		}
 

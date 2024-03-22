@@ -31,27 +31,27 @@ import io.nats.client.Message;
 import io.nats.client.impl.NatsJetStreamPullSubscription;
 import io.nats.client.impl.NatsJetStreamSubscription;
 import io.nats.client.impl.NatsMessage;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.integration.nats.NatsMessageDrivenChannelAdapter.NatsMessageHandler;
 
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 /**
  * Unit testing of container components
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -135,13 +135,13 @@ public class NatsContainerTest {
 		// Test exception handling when consumerFactory throws error
 		final NatsMessageListenerContainer exceptionContainer =
 				new NatsMessageListenerContainer(consumerFactory, NatsMessageDeliveryMode.PUSH_SYNC);
-		assertFalse(exceptionContainer.isRunning());
+		Assert.assertFalse(exceptionContainer.isRunning());
 		// call create subscription method and verify exception scenario
-		assertThrows(IOException.class, () -> exceptionContainer.createSubscription(messageHandler));
+		Assert.assertThrows(IOException.class, () -> exceptionContainer.createSubscription(messageHandler));
 		// verify method for PUSH SYNC mode mode is called
 		verify(consumerFactory, times(1)).createSyncPushSubscription();
 		// check if the container is running after exception in consumer factory
-		assertFalse(exceptionContainer.isRunning());
+		Assert.assertFalse(exceptionContainer.isRunning());
 	}
 
 	/**
@@ -165,26 +165,26 @@ public class NatsContainerTest {
 				new NatsMessageListenerContainer(consumerFactory, NatsMessageDeliveryMode.PUSH_SYNC);
 		final NatsMessageHandler<String> messageHandlerPullMode = mock(NatsMessageHandler.class);
 		// Assert container is inactive
-		assertFalse(container.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// call doStart method
 		container.setMessageHandler(messageHandlerPullMode);
 		container.doStart();
 		// verify method for PUSH SYNC mode mode is called
 		verify(consumerFactory, times(1)).createSyncPushSubscription();
 		// check if the container is running
-		assertTrue(container.isRunning());
+		Assert.assertTrue(container.isRunning());
 		// call doStart method again to verify that subscription is not created
 		// again
 		container.doStart();
 		// verify that subscription is not created again
 		verify(consumerFactory, times(1)).createSyncPushSubscription();
 		// check if the container is running after exception in consumer factory
-		assertTrue(container.isRunning());
+		Assert.assertTrue(container.isRunning());
 		// call doStop method
 		container.doStop(() -> {
 		});
 		// check if the container is stopped and unsubscribe is called
-		assertFalse(container.isRunning());
+		Assert.assertFalse(container.isRunning());
 		verify(pushSubscription, times(1)).unsubscribe();
 		// call doStart method again to verify that doStop block is not running
 		// again
@@ -224,8 +224,8 @@ public class NatsContainerTest {
 		// start adapter to initiate polling
 		adapterPullMode.start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapterPullMode.isRunning());
-		assertTrue(containerPullMode.isRunning());
+		Assert.assertTrue(adapterPullMode.isRunning());
+		Assert.assertTrue(containerPullMode.isRunning());
 		// Check if the thread is created with name specified
 		final Set<Thread> tSet = Thread.getAllStackTraces().keySet();
 		// thread name format for single container : pull-container-nats-C-1 =>
@@ -234,10 +234,10 @@ public class NatsContainerTest {
 				tSet.stream()
 						.filter(t -> ("pull-container" + "-nats-C-1").equalsIgnoreCase(t.getName()))
 						.findFirst();
-		assertTrue(optionalThread.isPresent());
+		Assert.assertTrue(optionalThread.isPresent());
 		final Thread thread = optionalThread.get();
 		// check if the thread is alive and running
-		assertTrue(thread.isAlive());
+		Assert.assertTrue(thread.isAlive());
 		// Wait till the messages are delivered via subscription
 		Thread.sleep(500);
 		verify(pullSubscription, atLeast(2)).iterate(50, Duration.ofMillis(100));
@@ -247,12 +247,12 @@ public class NatsContainerTest {
 		// stop adapter
 		adapterPullMode.stop();
 		// Assert that adapter and container is not running after stop
-		assertFalse(adapterPullMode.isRunning());
-		assertFalse(containerPullMode.isRunning());
+		Assert.assertFalse(adapterPullMode.isRunning());
+		Assert.assertFalse(containerPullMode.isRunning());
 		// check if the thread is stopped after container stop, wait for few
 		// seconds
 		Thread.sleep(2000);
-		assertFalse(thread.isAlive());
+		Assert.assertFalse(thread.isAlive());
 	}
 
 	/**
@@ -283,8 +283,8 @@ public class NatsContainerTest {
 		// start adapter to initiate polling
 		adapter.start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapter.isRunning());
-		assertTrue(container.isRunning());
+		Assert.assertTrue(adapter.isRunning());
+		Assert.assertTrue(container.isRunning());
 		// Check if the thread is created with name specified
 		final Set<Thread> tSet = Thread.getAllStackTraces().keySet();
 		// thread name format for single container : push-container-nats-C-1 =>
@@ -293,10 +293,10 @@ public class NatsContainerTest {
 				tSet.stream()
 						.filter(t -> ("push-container" + "-nats-C-1").equalsIgnoreCase(t.getName()))
 						.findFirst();
-		assertTrue(optionalThread.isPresent());
+		Assert.assertTrue(optionalThread.isPresent());
 		final Thread thread = optionalThread.get();
 		// check if the thread is alive and running
-		assertTrue(thread.isAlive());
+		Assert.assertTrue(thread.isAlive());
 		// Wait till the messages are delivered via subscription
 		Thread.sleep(500);
 		verify(pushSubscription, atLeast(2)).nextMessage(Duration.ofSeconds(30));
@@ -306,12 +306,12 @@ public class NatsContainerTest {
 		// stop adapter
 		adapter.stop();
 		// Assert that adapter and container is not running after stop
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// check if the thread is stopped after container stop, wait for few
 		// seconds
 		Thread.sleep(2000);
-		assertFalse(thread.isAlive());
+		Assert.assertFalse(thread.isAlive());
 	}
 
 	/**
@@ -406,8 +406,8 @@ public class NatsContainerTest {
 		// start adapter
 		adapterPushAsyncMode.start();
 		// Assert that adapter and container is running after start
-		assertTrue(adapterPushAsyncMode.isRunning());
-		assertTrue(adapterPushAsyncMode.isRunning());
+		Assert.assertTrue(adapterPushAsyncMode.isRunning());
+		Assert.assertTrue(adapterPushAsyncMode.isRunning());
 		// Check if the thread is not created by container
 		final Set<Thread> tSet = Thread.getAllStackTraces().keySet();
 		// thread name format : push-container-nats-C-?
@@ -415,7 +415,7 @@ public class NatsContainerTest {
 				tSet.stream()
 						.filter(t -> ("push-async-container" + "-nats-C-1").equalsIgnoreCase(t.getName()))
 						.findFirst();
-		assertFalse(optionalThread.isPresent());
+		Assert.assertFalse(optionalThread.isPresent());
 		// stop adapter
 		adapterPushAsyncMode.stop();
 	}

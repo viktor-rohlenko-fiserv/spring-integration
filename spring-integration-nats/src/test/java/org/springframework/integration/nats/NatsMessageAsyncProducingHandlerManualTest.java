@@ -16,12 +16,13 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
@@ -65,10 +66,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * Manual test cases to test NatsMessageAsyncProducingHandler in Internal Queue Overflow scenario.
  * Please set property -Dnats_server_host=remote and manually stop and start Nats server to simulate
  * nats unavailability
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -168,7 +170,7 @@ public class NatsMessageAsyncProducingHandlerManualTest extends AbstractNatsInte
 						+ messagesReceived.size());
 
 		messagesSent.keySet().stream()
-				.forEach(s -> System.out.println("Payload: " + s + " Count: " + messagesSent.get(s)));
+				.forEach(s -> LOG.info("Payload: " + s + " Count: " + messagesSent.get(s)));
 		messagesReceived.keySet().stream().forEach(System.out::println);
 		Assert.assertEquals(messagesSent.size(), messagesReceived.size());
 	}

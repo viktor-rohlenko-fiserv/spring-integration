@@ -19,10 +19,8 @@ package org.springframework.integration.nats;
 import java.io.IOException;
 
 import io.nats.client.Connection;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,10 +38,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * <p>Manual test cases to test NATS spring components communication with NATS server.
  *
  * <p>Prerequisite: set below properties and then start the test. -Dnats_js_enabled=false
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -75,13 +74,13 @@ public class NatsOutboundAdapterNegativeTest extends AbstractNatsIntegrationTest
 		final NatsMessageProducingHandler ipgNatsMessageProducingHandler =
 				new NatsMessageProducingHandler(natsTemplate);
 		final MessageDeliveryException messageDeliveryException =
-				assertThrows(
+				Assert.assertThrows(
 						MessageDeliveryException.class,
 						() ->
 								ipgNatsMessageProducingHandler.handleMessageInternal(
 										MessageBuilder.withPayload("testing").build()));
-		assertEquals(IOException.class, messageDeliveryException.getCause().getClass());
-		assertTrue(
+		Assert.assertEquals(IOException.class, messageDeliveryException.getCause().getClass());
+		Assert.assertTrue(
 				messageDeliveryException
 						.getMessage()
 						.contains("Exception occurred while sending message to invalid_subject"));

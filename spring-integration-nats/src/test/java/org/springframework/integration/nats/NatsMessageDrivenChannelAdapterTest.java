@@ -16,18 +16,15 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
+
+import javax.annotation.PostConstruct;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -61,10 +58,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  * <p>Integration test cases to test NATS spring components communication with docker/devlocal NAT
  * server.
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -127,16 +125,16 @@ public class NatsMessageDrivenChannelAdapterTest extends AbstractNatsIntegration
 				new NatsTemplate(this.natsConnection, TEST_SUBJECT, this.messageConvertor);
 		for (int i = 0; i < 5; i++) {
 			final PublishAck ack = natsTemplate.send("Hello" + i);
-			assertNotNull(ack);
-			assertEquals(TEST_STREAM, ack.getStream());
+			Assert.assertNotNull(ack);
+			Assert.assertEquals(TEST_STREAM, ack.getStream());
 		}
 
 		// Message Consumer Assertion -> Messages consumed via adapter should be
 		// available in the consumer channel
 		for (int i = 0; i < 5; i++) {
 			final Message<?> message = this.consumerChannel.receive(20000);
-			assertNotNull(message);
-			assertEquals("Hello" + i, message.getPayload());
+			Assert.assertNotNull(message);
+			Assert.assertEquals("Hello" + i, message.getPayload());
 		}
 		// stop adapter using messaging gateway
 		this.controlBus.send("@testAdapter.stop()");
@@ -161,22 +159,22 @@ public class NatsMessageDrivenChannelAdapterTest extends AbstractNatsIntegration
 		final AbstractNatsMessageListenerContainer container =
 				(AbstractNatsMessageListenerContainer) this.appContext.getBean("testErrorContainerSub");
 		// Assert that adapter and container is not running before start
-		assertFalse(adapter.isRunning());
-		assertFalse(container.isRunning());
+		Assert.assertFalse(adapter.isRunning());
+		Assert.assertFalse(container.isRunning());
 		// Check if NATS exception is thrown with expected message
 		final NatsException exception =
-				assertThrows(
+				Assert.assertThrows(
 						NatsException.class,
 						() -> {
 							this.controlBus.send("@testErrorAdapterSub.start()");
 						});
-		assertEquals(IllegalStateException.class, exception.getCause().getClass());
-		assertTrue(
+		Assert.assertEquals(IllegalStateException.class, exception.getCause().getClass());
+		Assert.assertTrue(
 				exception
 						.getMessage()
 						.contains("Subscription is not available to start the container for subject:"));
 		final IllegalStateException nestedException = (IllegalStateException) exception.getCause();
-		assertTrue(
+		Assert.assertTrue(
 				nestedException.getMessage().contains("[SUB-90007] No matching streams for subject."));
 		this.controlBus.send("@testErrorAdapterSub.stop()");
 	}

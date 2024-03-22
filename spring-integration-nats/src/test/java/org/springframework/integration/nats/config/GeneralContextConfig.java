@@ -12,16 +12,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * @author Viktor Rohlenko
- * @author Vennila Pazhamalai
- * @author Vivek Duraisamy
- * @since 6.4.x
- *
- * @see <a
- * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
- * all stakeholders and contact</a>
  */
+
 package org.springframework.integration.nats.config;
 
 import java.time.Duration;
@@ -41,6 +33,17 @@ import org.springframework.integration.nats.NatsMessageListenerContainer;
 import org.springframework.lang.NonNull;
 import org.springframework.messaging.MessageChannel;
 
+/*
+ * @author Viktor Rohlenko
+ * @author Vennila Pazhamalai
+ * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
+ * @since 6.4.x
+ *
+ * @see <a
+ * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
+ * all stakeholders and contact</a>
+ */
 public abstract class GeneralContextConfig {
 	public static final String TEST_SUBJECT = "test-subject";
 	public static final String TEST_STREAM = "test-stream";

@@ -26,7 +26,6 @@ import io.nats.spring.boot.autoconfigure.NatsConnectionProperties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Assert;
-import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -52,10 +51,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * be publishable by the client and an error will be returned.
  *
  * <p>More info: https://docs.nats.io/using-nats/developer/connecting/reconnect/buffer
-*
+ *
  * @author Viktor Rohlenko
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
  *
  * @see <a
@@ -111,7 +111,7 @@ public class NatsClientReconnectBufferTest extends AbstractNatsIntegrationTestSu
 		}
 		catch (Exception ex) {
 			// This is the expected behavior of NATS client when reconnect buffer is full
-			assertTrue(ex.getMessage().contains("Unable to queue any more messages during reconnect"));
+			Assert.assertTrue(ex.getMessage().contains("Unable to queue any more messages during reconnect"));
 		}
 	}
 
