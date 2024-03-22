@@ -367,7 +367,7 @@ public class NatsMessageConcurrentConsumerAcknowledgementTest
 		private final String name;
 		private int countSec;
 
-		public SecondsCounter(String name) {
+		SecondsCounter(String name) {
 			this.name = name;
 			LOG.info("Task: " + name);
 		}

@@ -283,7 +283,7 @@ public class NatsOutboundAdapterTest extends AbstractNatsIntegrationTestSupport 
 
 		private final String property;
 
-		public TestStub(final String propertyValue) {
+		TestStub(final String propertyValue) {
 			this.property = propertyValue;
 		}
 	}

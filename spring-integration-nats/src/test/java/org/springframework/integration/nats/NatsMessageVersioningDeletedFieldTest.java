@@ -16,17 +16,15 @@
 
 package org.springframework.integration.nats;
 
-import javax.annotation.PostConstruct;
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -49,6 +47,10 @@ import org.springframework.messaging.PollableChannel;
 import org.springframework.stereotype.Repository;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import java.io.IOException;
+
+import javax.annotation.PostConstruct;
 
 /**
  * Tests the flow using Producer and Consumer bean configuration without DSL

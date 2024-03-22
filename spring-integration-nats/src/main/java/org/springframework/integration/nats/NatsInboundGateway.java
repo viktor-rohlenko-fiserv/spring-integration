@@ -67,7 +67,7 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 	}
 
 	public boolean isExtractRequestPayload() {
-		return extractRequestPayload;
+		return this.extractRequestPayload;
 	}
 
 	public void setExtractRequestPayload(boolean extractRequestPayload) {
@@ -75,7 +75,7 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 	}
 
 	public boolean isExtractReplyPayload() {
-		return extractReplyPayload;
+		return this.extractReplyPayload;
 	}
 
 	public void setExtractReplyPayload(boolean extractReplyPayload) {
@@ -136,7 +136,7 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 
 		private void sendReply(Object replyMessage, Headers headers, String replyToSubject)
 				throws JetStreamApiException, IOException, InterruptedException {
-			natsTemplate.publishReply(replyMessage, headers, replyToSubject);
+			NatsInboundGateway.this.natsTemplate.publishReply(replyMessage, headers, replyToSubject);
 		}
 
 		@Override
@@ -144,8 +144,8 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 			org.springframework.messaging.Message<?> requestMessage;
 			try {
 				final Object result;
-				if (extractRequestPayload) {
-					result = messageConverter.fromMessage(msg);
+				if (NatsInboundGateway.this.extractRequestPayload) {
+					result = NatsInboundGateway.this.messageConverter.fromMessage(msg);
 					LOG.debug(
 							"converted NATS Message ["
 									+ msg
@@ -186,7 +186,7 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 					LOG.debug("Reply Message: " + replyMessage);
 					LOG.debug("Reply Subject: " + replyToSubject);
 					final Object replyResult;
-					if (extractReplyPayload) {
+					if (NatsInboundGateway.this.extractReplyPayload) {
 						replyResult = replyMessage.getPayload();
 					}
 					else {

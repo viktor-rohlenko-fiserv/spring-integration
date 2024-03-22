@@ -162,7 +162,7 @@ public class NatsMessageAsyncProducingHandlerTest extends AbstractNatsIntegratio
 						+ messagesReceived.size());
 
 		messagesSent.keySet().stream()
-				.forEach(s -> System.out.println("Payload: " + s + " Count: " + messagesSent.get(s)));
+				.forEach(s -> LOG.info("Payload: " + s + " Count: " + messagesSent.get(s)));
 		messagesReceived.keySet().stream().forEach(System.out::println);
 		Assert.assertEquals(messagesSent.size(), messagesReceived.size());
 	}
@@ -439,7 +439,7 @@ public class NatsMessageAsyncProducingHandlerTest extends AbstractNatsIntegratio
 		private final String name;
 		private int countSec;
 
-		public SecondsCounter(String name) {
+		SecondsCounter(String name) {
 			this.name = name;
 			LOG.info("Task: " + name);
 		}

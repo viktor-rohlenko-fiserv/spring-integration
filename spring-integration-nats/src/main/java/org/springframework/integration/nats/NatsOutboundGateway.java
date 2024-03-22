@@ -77,7 +77,7 @@ public class NatsOutboundGateway extends AbstractReplyProducingMessageHandler {
 	}
 
 	public long getReplyTimeout() {
-		return replyTimeout;
+		return this.replyTimeout;
 	}
 
 	public void setReplyTimeout(long replyTimeout) {
@@ -120,7 +120,7 @@ public class NatsOutboundGateway extends AbstractReplyProducingMessageHandler {
 	}
 
 	public String getReplyChannelName() {
-		return replyChannelName;
+		return this.replyChannelName;
 	}
 
 	public void setReplyChannelName(String replyChannelName) {
@@ -216,7 +216,7 @@ public class NatsOutboundGateway extends AbstractReplyProducingMessageHandler {
 		}
 		else {
 			try {
-				sendOutput(new ErrorMessage(result), errorChannel, true);
+				sendOutput(new ErrorMessage(result), this.errorChannel, true);
 			}
 			catch (Exception e) {
 				Exception exceptionToLog =
