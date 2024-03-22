@@ -380,11 +380,10 @@ public class NatsMessageAsyncProducingHandlerManualTest extends AbstractNatsInte
 		private final String name;
 		private int countSec;
 
-		public SecondsCounter(String name) {
+		SecondsCounter(String name) {
 			this.name = name;
 			LOG.info("Task: " + name);
 		}
-
 		public void run() {
 			LOG.info("Already waiting for " + countSec + " seconds.");
 			countSec++;

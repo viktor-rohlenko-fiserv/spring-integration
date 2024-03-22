@@ -35,7 +35,6 @@ import io.nats.client.support.NatsJetStreamConstants;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import static org.springframework.integration.nats.util.RetryablePair.of;
 import org.springframework.integration.handler.AbstractMessageProducingHandler;
 import org.springframework.integration.nats.math.Equations;
 import org.springframework.integration.nats.util.NatsUtils;
@@ -113,20 +112,20 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 
 	public NatsMessageAsyncProducingHandler(@NonNull final NatsTemplate pNatsTemplate) {
 		this.changeLogger = new StateChangeLogger(0);
-		ackQueueCapacityAmount = 100000;
-		ackQueueCapacityTimeout = Duration.ofMillis(1000);
-		ackNatsServerTimeout = Duration.ofMillis(1000);
-		maxAckFullQueueCapacityAmount = 3;
+		this.ackQueueCapacityAmount = 100000;
+		this.ackQueueCapacityTimeout = Duration.ofMillis(1000);
+		this.ackNatsServerTimeout = Duration.ofMillis(1000);
+		this.maxAckFullQueueCapacityAmount = 3;
 		this.natsTemplate = pNatsTemplate;
-		this.publishAckQueue = new ArrayBlockingQueue<>(ackQueueCapacityAmount);
-		ackReceiverMaxWait = DEFAULT_ACK_RECEIVER_MAX_WAIT;
+		this.publishAckQueue = new ArrayBlockingQueue<>(this.ackQueueCapacityAmount);
+		this.ackReceiverMaxWait = DEFAULT_ACK_RECEIVER_MAX_WAIT;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		executor.execute(new AckReceiver());
 	}
 
 	@Override
 	protected void handleMessageInternal(Message<?> message) {
-		double occupancy = Equations.percentage(publishAckQueue.size(), ackQueueCapacityAmount);
+		double occupancy = Equations.percentage(this.publishAckQueue.size(), this.ackQueueCapacityAmount);
 		// using non-linear dependency to slow down this producer. By reaching
 		// 100% of capacity the producer will be slow down for 32 seconds by
 		// processing each method
@@ -162,8 +161,8 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 				final CompletableFuture<PublishAck> publishAck =
 						this.natsTemplate.sendAsync(payload, headers);
 				boolean success =
-						publishAckQueue.offer(
-								of(publishAck, message), ackQueueCapacityTimeout.toMillis(), TimeUnit.MILLISECONDS);
+						this.publishAckQueue.offer(
+								RetryablePair.of(publishAck, message), this.ackQueueCapacityTimeout.toMillis(), TimeUnit.MILLISECONDS);
 				if (!success) {
 					LOG.info(
 							"I had an issue to offer the message to publishAckQueue of BlockingQueue. It could be due to properties org.springframework.integration.nats.producer.ack.capacity and org.springframework.integration.nats.producer.ack.capacity.timeout.mls."
@@ -206,7 +205,7 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 	}
 
 	public Duration getAckQueueCapacityTimeout() {
-		return ackQueueCapacityTimeout;
+		return this.ackQueueCapacityTimeout;
 	}
 
 	public void setAckQueueCapacityTimeout(Duration ackQueueCapacityTimeout) {
@@ -214,7 +213,7 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 	}
 
 	public Duration getAckNatsServerTimeout() {
-		return ackNatsServerTimeout;
+		return this.ackNatsServerTimeout;
 	}
 
 	public void setAckNatsServerTimeout(Duration ackNatsServerTimeout) {
@@ -222,7 +221,7 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 	}
 
 	public int getAckQueueCapacityAmount() {
-		return ackQueueCapacityAmount;
+		return this.ackQueueCapacityAmount;
 	}
 
 	public void setAckQueueCapacityAmount(int ackQueueCapacityAmount) {
@@ -254,24 +253,24 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 			while (true) {
 				// If Queue is empty, slow down peeking of this thread by 30
 				// seconds( configurable later)
-				if (publishAckQueue.isEmpty()) {
-					slowDownIfNecessary(ackReceiverMaxWait);
+				if (NatsMessageAsyncProducingHandler.this.publishAckQueue.isEmpty()) {
+					slowDownIfNecessary(NatsMessageAsyncProducingHandler.this.ackReceiverMaxWait);
 				}
 				else {
 					RetryablePair<CompletableFuture<PublishAck>, Message<?>> ackPair = null;
-					ackPair = publishAckQueue.peek();
+					ackPair = NatsMessageAsyncProducingHandler.this.publishAckQueue.peek();
 					CompletableFuture<PublishAck> pubAck = ackPair.getFirst();
 					Message<?> message = ackPair.getSecond();
 					try {
 						PublishAck publishAck =
-								pubAck.get(ackNatsServerTimeout.toMillis(), TimeUnit.MILLISECONDS);
+								pubAck.get(NatsMessageAsyncProducingHandler.this.ackNatsServerTimeout.toMillis(), TimeUnit.MILLISECONDS);
 						if (publishAck != null) {
 							LOG.debug(
 									"Nats Message acknowledgment received: "
 											+ message.getPayload()
 											+ " "
 											+ publishAck);
-							publishAckQueue.remove(ackPair);
+							NatsMessageAsyncProducingHandler.this.publishAckQueue.remove(ackPair);
 						}
 						else {
 							handleUnpleasantAck(ackPair, pubAck, message);
@@ -296,7 +295,7 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 						// retry logic set inputChannel=replyChannel, because
 						// the message will be polled again from inputChannel.
 						// That is how the redelivery works.
-						publishAckQueue.remove(ackPair);
+						NatsMessageAsyncProducingHandler.this.publishAckQueue.remove(ackPair);
 						sendOutput(message, null, false);
 					}
 				}
@@ -307,8 +306,8 @@ public class NatsMessageAsyncProducingHandler extends AbstractMessageProducingHa
 				RetryablePair<CompletableFuture<PublishAck>, Message<?>> ackPair,
 				CompletableFuture<PublishAck> pubAck,
 				Message<?> message) {
-			if (ackPair.increment() > maxAckFullQueueCapacityAmount) {
-				publishAckQueue.remove(ackPair);
+			if (ackPair.increment() > NatsMessageAsyncProducingHandler.this.maxAckFullQueueCapacityAmount) {
+				NatsMessageAsyncProducingHandler.this.publishAckQueue.remove(ackPair);
 				sendOutput(message, null, false);
 			}
 		}

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+
 package org.springframework.integration.nats;
 
 import java.util.concurrent.CountDownLatch;
