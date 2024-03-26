@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springframework.integration.nats;
 
 import java.io.BufferedReader;
@@ -28,298 +29,315 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Class to run gnatds for tests. Highly based on the 1.0 client's NatsServer code.
  *
  * <p>This class will be removed once we move to testContainer approach
  *
  * <p>More info here: https://escmconfluence.1dc.com/display/IPG/NATS+-+Integration+Testing+Approach
- */
-
-/**
- * @author Viktor Rohlenko - lead and architect
- * @author Vennila Pazhamalai - maintainer
- * @author Vivek Duraisamy - maintainer
- * @see <a
- *     href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
- *     all stakeholders and contact</a>
+ *
+ * @author Viktor Rohlenko
+ * @author Vennila Pazhamalai
+ * @author Vivek Duraisamy
+ * @author Pratiyush Kumar Singh
  * @since 6.4.x
+ *
+ * @see <a
+ * href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
+ * all stakeholders and contact</a>
  */
 public class NatsLocalTestServer implements AutoCloseable {
 
-  /* Default location of server installation (deployment type without docker).
-   * This can be overwritten by e.g. using -Dnats_server_path={your local installation}
-   */
-  private static final String NATS_SERVER =
-      "C:\\Software\\nats\\nats-server-v2.6.6-windows-386\\nats-server";
+	private static final Log LOG = LogFactory.getLog(NatsLocalTestServer.class);
 
-  // Use a new port each time, we increment and get so start at the normal
-  // port
-  private static final AtomicInteger portCounter = new AtomicInteger(5222);
+	/* Default location of server installation (deployment type without docker).
+	 * This can be overwritten by e.g. using -Dnats_server_path={your local installation}
+	 */
+	private static final String NATS_SERVER =
+			"C:\\Software\\nats\\nats-server-v2.6.6-windows-386\\nats-server";
 
-  private final int port;
+	// Use a new port each time, we increment and get so start at the normal
+	// port
+	private static final AtomicInteger portCounter = new AtomicInteger(5222);
 
-  private final boolean debug;
+	private final int port;
 
-  private String configFilePath;
+	private final boolean debug;
 
-  private Process process;
+	private String configFilePath;
 
-  private String cmdLine;
+	private Process process;
 
-  private String[] customArgs;
+	private String cmdLine;
 
-  private String[] configInserts;
+	private String[] customArgs;
 
-  public NatsLocalTestServer() {
-    this(false);
-  }
+	private String[] configInserts;
 
-  public NatsLocalTestServer(final boolean pDebug) {
-    this(NatsLocalTestServer.nextPort(), pDebug);
-  }
+	public NatsLocalTestServer() {
+		this(false);
+	}
 
-  public NatsLocalTestServer(final int portNo, final boolean pDebug) {
-    this.port = portNo;
-    this.debug = pDebug;
-    start();
-  }
+	public NatsLocalTestServer(final boolean pDebug) {
+		this(NatsLocalTestServer.nextPort(), pDebug);
+	}
 
-  public NatsLocalTestServer(final String pConfigFilePath, final boolean pDebug) {
-    this.configFilePath = pConfigFilePath;
-    this.debug = pDebug;
-    this.port = nextPort();
-    start();
-  }
+	public NatsLocalTestServer(final int portNo, final boolean pDebug) {
+		this.port = portNo;
+		this.debug = pDebug;
+		start();
+	}
 
-  public NatsLocalTestServer(
-      final String pConfigFilePath,
-      final String[] pInserts,
-      final int portNo,
-      final boolean pDebug) {
-    this.configFilePath = pConfigFilePath;
-    this.configInserts = pInserts;
-    this.debug = pDebug;
-    this.port = portNo;
-    start();
-  }
+	public NatsLocalTestServer(final String pConfigFilePath, final boolean pDebug) {
+		this.configFilePath = pConfigFilePath;
+		this.debug = pDebug;
+		this.port = nextPort();
+		start();
+	}
 
-  public NatsLocalTestServer(final String pConfigFilePath, final int portNo, final boolean pDebug) {
-    this.configFilePath = pConfigFilePath;
-    this.debug = pDebug;
-    this.port = portNo;
-    start();
-  }
+	public NatsLocalTestServer(
+			final String pConfigFilePath,
+			final String[] pInserts,
+			final int portNo,
+			final boolean pDebug) {
+		this.configFilePath = pConfigFilePath;
+		this.configInserts = pInserts;
+		this.debug = pDebug;
+		this.port = portNo;
+		start();
+	}
 
-  public NatsLocalTestServer(final String[] pCustomArgs, final boolean pDebug) {
-    this.port = NatsLocalTestServer.nextPort();
-    this.debug = pDebug;
-    this.customArgs = pCustomArgs;
-    start();
-  }
+	public NatsLocalTestServer(final String pConfigFilePath, final int portNo, final boolean pDebug) {
+		this.configFilePath = pConfigFilePath;
+		this.debug = pDebug;
+		this.port = portNo;
+		start();
+	}
 
-  public NatsLocalTestServer(final String[] pCustomArgs, final int portNo, final boolean pDebug) {
-    this.port = portNo;
-    this.debug = pDebug;
-    this.customArgs = pCustomArgs;
-    start();
-  }
+	public NatsLocalTestServer(final String[] pCustomArgs, final boolean pDebug) {
+		this.port = NatsLocalTestServer.nextPort();
+		this.debug = pDebug;
+		this.customArgs = pCustomArgs;
+		start();
+	}
 
-  public static String generateNatsServerVersionString() {
-    final ArrayList<String> cmd = new ArrayList<>();
+	public NatsLocalTestServer(final String[] pCustomArgs, final int portNo, final boolean pDebug) {
+		this.port = portNo;
+		this.debug = pDebug;
+		this.customArgs = pCustomArgs;
+		start();
+	}
 
-    String server_path = System.getProperty("nats_server_path");
+	public static String generateNatsServerVersionString() {
+		final ArrayList<String> cmd = new ArrayList<>();
 
-    if (server_path == null) {
-      server_path = NatsLocalTestServer.NATS_SERVER;
-    }
+		String server_path = System.getProperty("nats_server_path");
 
-    cmd.add(server_path);
-    cmd.add("--version");
+		if (server_path == null) {
+			server_path = NatsLocalTestServer.NATS_SERVER;
+		}
 
-    try {
-      final ProcessBuilder pb = new ProcessBuilder(cmd);
-      final Process process = pb.start();
-      process.waitFor();
-      final BufferedReader reader =
-          new BufferedReader(new InputStreamReader(process.getInputStream()));
-      final ArrayList<String> lines = new ArrayList<>();
-      String line = "";
-      while ((line = reader.readLine()) != null) {
-        lines.add(line);
-      }
+		cmd.add(server_path);
+		cmd.add("--version");
 
-      if (!lines.isEmpty()) {
-        return lines.get(0);
-      }
+		try {
+			final ProcessBuilder pb = new ProcessBuilder(cmd);
+			final Process process = pb.start();
+			process.waitFor();
+			final BufferedReader reader =
+					new BufferedReader(new InputStreamReader(process.getInputStream()));
+			final ArrayList<String> lines = new ArrayList<>();
+			String line = "";
+			while ((line = reader.readLine()) != null) {
+				lines.add(line);
+			}
 
-      return null;
-    } catch (final Exception exp) {
-      return null;
-    }
-  }
+			if (!lines.isEmpty()) {
+				return lines.get(0);
+			}
 
-  public static int nextPort() {
-    return NatsLocalTestServer.portCounter.incrementAndGet();
-  }
+			return null;
+		}
+		catch (final Exception exp) {
+			return null;
+		}
+	}
 
-  public static int currentPort() {
-    return NatsLocalTestServer.portCounter.get();
-  }
+	public static int nextPort() {
+		return NatsLocalTestServer.portCounter.incrementAndGet();
+	}
 
-  public static String getURIForPort(final int port) {
-    return "nats://localhost:" + port;
-  }
+	public static int currentPort() {
+		return NatsLocalTestServer.portCounter.get();
+	}
 
-  public void start() {
-    final ArrayList<String> cmd = new ArrayList<>();
+	public static String getURIForPort(final int port) {
+		return "nats://localhost:" + port;
+	}
 
-    String server_path = System.getProperty("nats_server_path");
+	public void start() {
+		final ArrayList<String> cmd = new ArrayList<>();
 
-    if (server_path == null) {
-      server_path = NatsLocalTestServer.NATS_SERVER;
-    }
+		String server_path = System.getProperty("nats_server_path");
 
-    cmd.add(server_path);
+		if (server_path == null) {
+			server_path = NatsLocalTestServer.NATS_SERVER;
+		}
 
-    // Rewrite the port to a new one, so we don't reuse the same one over
-    // and over
-    if (this.configFilePath != null) {
-      final Pattern pattern = Pattern.compile("port: (\\d+)");
-      final Matcher matcher = pattern.matcher("");
-      BufferedReader read = null;
-      File tmp = null;
-      BufferedWriter write = null;
-      String line;
+		cmd.add(server_path);
 
-      try {
-        tmp = File.createTempFile("nats_java_test", ".conf");
-        write = new BufferedWriter(new FileWriter(tmp));
-        read = new BufferedReader(new FileReader(this.configFilePath));
+		// Rewrite the port to a new one, so we don't reuse the same one over
+		// and over
+		if (this.configFilePath != null) {
+			final Pattern pattern = Pattern.compile("port: (\\d+)");
+			final Matcher matcher = pattern.matcher("");
+			BufferedReader read = null;
+			File tmp = null;
+			BufferedWriter write = null;
+			String line;
 
-        while ((line = read.readLine()) != null) {
-          matcher.reset(line);
+			try {
+				tmp = File.createTempFile("nats_java_test", ".conf");
+				write = new BufferedWriter(new FileWriter(tmp));
+				read = new BufferedReader(new FileReader(this.configFilePath));
 
-          if (matcher.find()) {
-            line = line.replace(matcher.group(1), String.valueOf(this.port));
-          }
+				while ((line = read.readLine()) != null) {
+					matcher.reset(line);
 
-          write.write(line);
-          write.write("\n");
-        }
+					if (matcher.find()) {
+						line = line.replace(matcher.group(1), String.valueOf(this.port));
+					}
 
-        if (this.configInserts != null) {
-          for (final String s : this.configInserts) {
-            write.write(s);
-            write.write("\n");
-          }
-        }
-      } catch (final Exception exp) {
-        System.out.println("%%% Error parsing config file for port.");
-        return;
-      } finally {
-        if (read != null) {
-          try {
-            read.close();
-          } catch (final Exception e) {
-            throw new IllegalStateException("Failed to read config file");
-          }
-        }
-        if (write != null) {
-          try {
-            write.close();
-          } catch (final Exception e) {
-            throw new IllegalStateException("Failed to update config file");
-          }
-        }
-      }
+					write.write(line);
+					write.write("\n");
+				}
 
-      cmd.add("--config");
-      cmd.add(tmp.getAbsolutePath());
-    } else {
-      cmd.add("--port");
-      cmd.add(String.valueOf(this.port));
-    }
+				if (this.configInserts != null) {
+					for (final String s : this.configInserts) {
+						write.write(s);
+						write.write("\n");
+					}
+				}
+			}
+			catch (final Exception exp) {
+				LOG.info("%%% Error parsing config file for port.");
+				return;
+			}
+			finally {
+				if (read != null) {
+					try {
+						read.close();
+					}
+					catch (final Exception e) {
+						throw new IllegalStateException("Failed to read config file");
+					}
+				}
+				if (write != null) {
+					try {
+						write.close();
+					}
+					catch (final Exception e) {
+						throw new IllegalStateException("Failed to update config file");
+					}
+				}
+			}
 
-    if (this.customArgs != null) {
-      cmd.addAll(Arrays.asList(this.customArgs));
-    }
+			cmd.add("--config");
+			cmd.add(tmp.getAbsolutePath());
+		}
+		else {
+			cmd.add("--port");
+			cmd.add(String.valueOf(this.port));
+		}
 
-    if (this.debug) {
-      cmd.add("-DV");
-    }
+		if (this.customArgs != null) {
+			cmd.addAll(Arrays.asList(this.customArgs));
+		}
 
-    this.cmdLine = String.join(" ", cmd);
+		if (this.debug) {
+			cmd.add("-DV");
+		}
 
-    try {
-      final ProcessBuilder pb = new ProcessBuilder(cmd);
+		this.cmdLine = String.join(" ", cmd);
 
-      if (this.debug) {
-        System.out.println("%%% Starting [" + this.cmdLine + "] with redirected IO");
-        pb.inheritIO();
-      } else {
-        String errFile = null;
-        final String osName = System.getProperty("os.name");
+		try {
+			final ProcessBuilder pb = new ProcessBuilder(cmd);
 
-        if (osName != null && osName.contains("Windows")) {
-          // Windows uses the "nul" file.
-          errFile = "nul";
-        } else {
-          errFile = "/dev/null";
-        }
+			if (this.debug) {
+				LOG.debug("%%% Starting [" + this.cmdLine + "] with redirected IO");
+				pb.inheritIO();
+			}
+			else {
+				String errFile = null;
+				final String osName = System.getProperty("os.name");
 
-        pb.redirectError(new File(errFile));
-      }
+				if (osName != null && osName.contains("Windows")) {
+					// Windows uses the "nul" file.
+					errFile = "nul";
+				}
+				else {
+					errFile = "/dev/null";
+				}
 
-      this.process = pb.start();
+				pb.redirectError(new File(errFile));
+			}
 
-      int tries = 10;
-      // wait at least 1x and maybe 10
-      do {
-        try {
-          Thread.sleep(100);
-        } catch (final Exception exp) {
-          // Give the server time to get going
-        }
-        tries--;
-      } while (!this.process.isAlive() && tries > 0);
+			this.process = pb.start();
 
-      System.out.println("%%% Started [" + this.cmdLine + "]");
-    } catch (final IOException ex) {
-      System.out.println("%%% Failed to start [" + this.cmdLine + "] with message:");
-      System.out.println("\t" + ex.getMessage());
-      System.out.println("%%% Make sure that the nats-server is installed and in your PATH.");
-      System.out.println(
-          "%%% See https://github.com/nats-io/nats-server for information on installation");
+			int tries = 10;
+			// wait at least 1x and maybe 10
+			do {
+				try {
+					Thread.sleep(100);
+				}
+				catch (final Exception exp) {
+					// Give the server time to get going
+				}
+				tries--;
+			} while (!this.process.isAlive() && tries > 0);
 
-      throw new IllegalStateException("Failed to run [" + this.cmdLine + "]");
-    }
-  }
+			LOG.info("%%% Started [" + this.cmdLine + "]");
+		}
+		catch (final IOException ex) {
+			LOG.error("%%% Failed to start [" + this.cmdLine + "] with message:");
+			LOG.error("\t" + ex.getMessage());
+			LOG.error("%%% Make sure that the nats-server is installed and in your PATH.");
+			LOG.error(
+					"%%% See https://github.com/nats-io/nats-server for information on installation");
 
-  public int getPort() {
-    return this.port;
-  }
+			throw new IllegalStateException("Failed to run [" + this.cmdLine + "]");
+		}
+	}
 
-  public String getURI() {
-    return getURIForPort(this.port);
-  }
+	public int getPort() {
+		return this.port;
+	}
 
-  public void shutdown() {
+	public String getURI() {
+		return getURIForPort(this.port);
+	}
 
-    if (this.process == null) {
-      return;
-    }
+	public void shutdown() {
 
-    this.process.destroy();
+		if (this.process == null) {
+			return;
+		}
 
-    System.out.println("%%% Shut down [" + this.cmdLine + "]");
+		this.process.destroy();
 
-    this.process = null;
-  }
+		LOG.info("%%% Shut down [" + this.cmdLine + "]");
 
-  /** Synonomous with shutdown. */
-  @Override
-  public void close() {
-    shutdown();
-  }
+		this.process = null;
+	}
+
+	/**
+	 * Synonomous with shutdown.
+	 */
+	@Override
+	public void close() {
+		shutdown();
+	}
 }
