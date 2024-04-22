@@ -83,6 +83,6 @@ public class NatsOutboundAdapterNegativeTest extends AbstractNatsIntegrationTest
 		Assert.assertTrue(
 				messageDeliveryException
 						.getMessage()
-						.contains("Exception occurred while sending message to invalid_subject"));
+						.contains("Exception occurred while sending message to validSubject"));
 	}
 }

@@ -197,7 +197,7 @@ public class NatsMessageDrivenChannelAdapterMessageConversionTest
 		Assert.assertTrue(transformException.getMessage().contains("Failed to transform Message in bean"));
 		Assert.assertEquals(
 				"intentional Runtime Exception in transformer",
-				transformException.getCause().getCause().getMessage());
+				transformException.getCause().getMessage());
 
 		// Message Producer: Publish new messages to topic via
 		// natsTemplateString

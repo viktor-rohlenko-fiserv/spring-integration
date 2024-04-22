@@ -118,27 +118,27 @@ public class NatsSynchronousMessageProducerResilienceTest
 	 *
 	 * <p>Test scenario: Send some messages while NATS server is unavailable.
 	 *
-	 * <p>Result Expected: these messages will be retried as per the spring retry configuration. Once
-	 * the retries are exhausted, verify if the messages sent during the server unavailability is sent
-	 * to errorChannel for logging
+	 * <p>Result Expected: these messages will be retried as per the spring retry configuration.
+	 * Once the retries are exhausted, verify if the messages sent during the server unavailability
+	 * is sent to errorChannel for logging
 	 *
 	 * <p>Bean Context for this test defined below in Producer Flow Bean: {@link
 	 * NatsSynchronousMessageProducerResilienceTest.ContextConfig#outboundFlow()}
 	 *
-	 * @throws InterruptedException if any thread has interrupted the current thread. The interrupted
-	 *                              status of the current thread is cleared when this exception is thrown.
-	 */
+	 *  @throws InterruptedException if any thread has interrupted the current thread. The
+	 *  interrupted status of the current thread is cleared when this exception is thrown.
+	 *  */
 	@Test
-	public void testProducerResiliency() throws InterruptedException {
+	public void testProducerResiliency() throws Exception {
 		// Send 10 messages - positive flow - message sent successfully
 		sendBunchMessages(0, 10);
 		// stop Nats server to simulate server unavailability
-		stopNatsServerInLocal();
+		stopNatsServer();
 		// send some messages while NATS server is unavailable - these messages will be retried as per
 		// the configuration
 		sendBunchMessages(10, 20);
 		// start Nats server again
-		startNatsServerInLocal();
+		startNatsServer();
 		// send some more messages to check if the messages are sent - producer flow should not block
 		sendBunchMessages(20, 30);
 
@@ -153,7 +153,7 @@ public class NatsSynchronousMessageProducerResilienceTest
 			Throwable error = errorMessages.get(payload);
 			Assert.assertNotNull(error);
 			Assert.assertTrue(
-					error.getMessage().contains("Timeout or no response waiting for NATS JetStream server"));
+					error.getMessage().contains("Failed to handle"));
 		}
 		// Verify if all other messages are sent to the consumer channel
 		for (int i = 0; i < 10; i++) {

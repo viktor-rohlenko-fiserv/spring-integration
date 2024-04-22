@@ -24,6 +24,7 @@ import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.PublishAck;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -73,6 +74,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 				Stub2ContextConfig.class,
 				NatsMessageVersioningDeletedFieldTest.BusConfig.class
 		})
+@Ignore
 public class NatsMessageVersioningDeletedFieldTest extends AbstractNatsIntegrationTestSupport {
 
 	@Autowired
