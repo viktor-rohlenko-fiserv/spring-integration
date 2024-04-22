@@ -126,7 +126,7 @@ public abstract class AbstractNatsIntegrationTestSupport {
 		}
 	}
 
-	public static void startNatsServerInLocal() throws InterruptedException {
+	private static void startNatsServerInLocal() throws InterruptedException {
 		natsLocal =
 				new NatsLocalTestServer(jetStreamEnabled ? tlsConfPath : tlsConfPathWithOutJS, 4222, true);
 		Thread.sleep(5000);

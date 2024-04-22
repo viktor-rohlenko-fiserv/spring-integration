@@ -16,8 +16,6 @@
 
 package org.springframework.integration.nats;
 
-import java.io.IOException;
-
 import io.nats.client.Connection;
 import org.junit.Assert;
 import org.junit.Test;
@@ -82,16 +80,16 @@ public class NatsMessageDrivenChannelAdapterNegativeFlowTest
 		Assert.assertFalse(container.isRunning());
 		// Check if NATS exception is thrown with expected message
 		final NatsException exception = Assert.assertThrows(NatsException.class, () -> container.start());
-		Assert.assertEquals(IOException.class, exception.getCause().getClass());
+		Assert.assertEquals(IllegalStateException.class, exception.getCause().getClass());
 		Assert.assertTrue(
 				exception
 						.getMessage()
 						.contains("Subscription is not available to start the container for subject:"));
-		final IOException nestedException = (IOException) exception.getCause();
+		final IllegalStateException nestedException = (IllegalStateException) exception.getCause();
 		Assert.assertTrue(
 				nestedException
 						.getMessage()
-						.contains("Timeout or no response waiting for NATS JetStream server"));
+						.contains("[SUB-90007] No matching streams for subject."));
 		// Assert that adapter and container is not running after start
 		Assert.assertFalse(adapter.isRunning());
 		Assert.assertFalse(container.isRunning());

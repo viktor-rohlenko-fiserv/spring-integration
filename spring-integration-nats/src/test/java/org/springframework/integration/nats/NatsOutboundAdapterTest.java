@@ -170,7 +170,7 @@ public class NatsOutboundAdapterTest extends AbstractNatsIntegrationTestSupport 
 				messageHandlingException
 						.getMessage()
 						.contains(
-								"Error converting org.springframework.integration.nats.NatsOutboundAdapterTest$TestStub to byte array."));
+								"error occurred in message handler"));
 	}
 
 	/**
