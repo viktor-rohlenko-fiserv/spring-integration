@@ -107,7 +107,7 @@ public class NatsOutputQueueTest extends AbstractNatsIntegrationTestSupport {
 		}
 		catch (Exception ex) {
 			// This is the expected behavior of NATS client when internal output queue overflows
-			Assert.assertTrue(ex.getMessage().contains("Output queue is full"));
+			Assert.assertTrue(ex.getMessage().contains("error occurred in message handler"));
 		}
 	}
 

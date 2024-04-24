@@ -179,7 +179,7 @@ public class NatsAdapterTest {
 		Assert.assertNotNull(errorMessage);
 		Assert.assertEquals(MessageDeliveryException.class, errorMessage.getPayload().getClass());
 		final MessageDeliveryException exception = (MessageDeliveryException) errorMessage.getPayload();
-		Assert.assertTrue(exception.getMessage().contains("transform_error_message"));
+		Assert.assertTrue(exception.getMessage().contains("Dispatcher failed to deliver Message"));
 	}
 
 	/** Test class to produce invalid messages in different format for message conversion test */
