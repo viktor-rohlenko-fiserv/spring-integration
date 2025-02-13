@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -363,9 +363,9 @@ public class GatewayProxyFactoryBean<T> extends AbstractEndpoint
 
 	/**
 	 * Set the executor for use when the gateway method returns
-	 * {@link java.util.concurrent.Future} or {@link org.springframework.util.concurrent.ListenableFuture}.
+	 * {@link Future} or {@link CompletableFuture}.
 	 * Set it to null to disable the async processing, and any
-	 * {@link java.util.concurrent.Future} return types must be returned by the downstream flow.
+	 * {@link Future} return types must be returned by the downstream flow.
 	 * @param executor The executor.
 	 */
 	public void setAsyncExecutor(@Nullable Executor executor) {
@@ -522,7 +522,6 @@ public class GatewayProxyFactoryBean<T> extends AbstractEndpoint
 
 	@Override
 	@Nullable
-	@SuppressWarnings("deprecation")
 	public Object invoke(final MethodInvocation invocation) throws Throwable { // NOSONAR
 		Method method = invocation.getMethod();
 		Class<?> returnType;
@@ -540,10 +539,6 @@ public class GatewayProxyFactoryBean<T> extends AbstractEndpoint
 			}
 			else if (CompletableFuture.class.equals(returnType)) { // exact
 				return CompletableFuture.supplyAsync(invoker, this.asyncExecutor);
-			}
-			else if (org.springframework.util.concurrent.ListenableFuture.class.equals(returnType)) {
-				return ((org.springframework.core.task.AsyncListenableTaskExecutor) this.asyncExecutor)
-						.submitListenable(invoker::get);
 			}
 			else if (Future.class.isAssignableFrom(returnType)) {
 				logger.debug(() -> "AsyncTaskExecutor submit*() return types are incompatible with the method return " +

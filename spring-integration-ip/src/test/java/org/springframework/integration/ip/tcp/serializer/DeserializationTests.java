@@ -28,8 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ServerSocketFactory;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.core.serializer.DefaultDeserializer;
@@ -42,13 +41,14 @@ import org.springframework.integration.ip.tcp.connection.TcpNioServerConnectionF
 import org.springframework.integration.ip.util.SocketTestUtils;
 import org.springframework.integration.ip.util.TestingUtilities;
 import org.springframework.integration.support.MessageBuilder;
-import org.springframework.integration.test.support.LongRunningIntegrationTest;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.support.GenericMessage;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatException;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIOException;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -59,9 +59,6 @@ import static org.mockito.Mockito.mock;
  * @since 2.0
  */
 public class DeserializationTests {
-
-	@Rule
-	public LongRunningIntegrationTest longRunningIntegrationTest = new LongRunningIntegrationTest();
 
 	@Test
 	public void testReadLength() throws Exception {
@@ -139,13 +136,8 @@ public class DeserializationTests {
 		ByteArrayElasticRawDeserializer serializer = new ByteArrayElasticRawDeserializer();
 		byte[] out = serializer.deserialize(socket.getInputStream());
 		assertThat(new String(out)).as("Data").isEqualTo(SocketTestUtils.TEST_STRING + SocketTestUtils.TEST_STRING);
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected end of Stream");
-		}
-		catch (SoftEndOfStreamException e) {
-			// NOSONAR
-		}
+		assertThatExceptionOfType(SoftEndOfStreamException.class)
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()));
 		server.close();
 	}
 
@@ -175,15 +167,9 @@ public class DeserializationTests {
 		Socket socket = server.accept();
 		socket.setSoTimeout(5000);
 		ByteArrayLengthHeaderSerializer serializer = new ByteArrayLengthHeaderSerializer();
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected message length exceeded exception");
-		}
-		catch (IOException e) {
-			if (!e.getMessage().startsWith("Message length")) {
-				fail("Unexpected IO Error:" + e.getMessage());
-			}
-		}
+		assertThatIOException()
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()))
+				.withMessageStartingWith("Message length");
 		server.close();
 		done.countDown();
 	}
@@ -197,15 +183,9 @@ public class DeserializationTests {
 		Socket socket = server.accept();
 		socket.setSoTimeout(500);
 		ByteArrayStxEtxSerializer serializer = new ByteArrayStxEtxSerializer();
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected timeout exception");
-		}
-		catch (IOException e) {
-			if (!e.getMessage().startsWith("Read timed out")) {
-				fail("Unexpected IO Error:" + e.getMessage());
-			}
-		}
+		assertThatIOException()
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()))
+				.withMessageStartingWith("Read timed out");
 		server.close();
 		done.countDown();
 	}
@@ -219,16 +199,10 @@ public class DeserializationTests {
 		Socket socket = server.accept();
 		socket.setSoTimeout(5000);
 		ByteArrayStxEtxSerializer serializer = new ByteArrayStxEtxSerializer();
-		serializer.setMaxMessageSize(1024);
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected message length exceeded exception");
-		}
-		catch (IOException e) {
-			if (!e.getMessage().startsWith("ETX not found")) {
-				fail("Unexpected IO Error:" + e.getMessage());
-			}
-		}
+		serializer.setMaxMessageSize(8);
+		assertThatIOException()
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()))
+				.withMessageStartingWith("ETX not found");
 		server.close();
 		done.countDown();
 	}
@@ -240,17 +214,11 @@ public class DeserializationTests {
 		server.setSoTimeout(10000);
 		CountDownLatch latch = SocketTestUtils.testSendCrLfOverflow(port);
 		Socket socket = server.accept();
-		socket.setSoTimeout(500);
+		socket.setSoTimeout(100);
 		ByteArrayCrLfSerializer serializer = new ByteArrayCrLfSerializer();
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected timout exception");
-		}
-		catch (IOException e) {
-			if (!e.getMessage().startsWith("Read timed out")) {
-				fail("Unexpected IO Error:" + e.getMessage());
-			}
-		}
+		assertThatIOException()
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()))
+				.withMessageStartingWith("Read timed out");
 		server.close();
 		latch.countDown();
 	}
@@ -264,16 +232,10 @@ public class DeserializationTests {
 		Socket socket = server.accept();
 		socket.setSoTimeout(5000);
 		ByteArrayCrLfSerializer serializer = new ByteArrayCrLfSerializer();
-		serializer.setMaxMessageSize(1024);
-		try {
-			serializer.deserialize(socket.getInputStream());
-			fail("Expected message length exceeded exception");
-		}
-		catch (IOException e) {
-			if (!e.getMessage().startsWith("CRLF not found")) {
-				fail("Unexpected IO Error:" + e.getMessage());
-			}
-		}
+		serializer.setMaxMessageSize(16);
+		assertThatIOException()
+				.isThrownBy(() -> serializer.deserialize(socket.getInputStream()))
+				.withMessageStartingWith("CRLF not found");
 		server.close();
 		latch.countDown();
 	}
@@ -306,7 +268,8 @@ public class DeserializationTests {
 		assertThat(new String(event.getBuffer()).substring(0, 1)).isEqualTo(new String(new byte[] {7}));
 		doDeserialize(new ByteArrayLfSerializer(), "Terminator '0xa' not found before max message length: 5");
 		doDeserialize(new ByteArrayRawSerializer(), "Socket was not closed before max message length: 5");
-		doDeserialize(new ByteArraySingleTerminatorSerializer((byte) 0xfe), "Terminator '0xfe' not found before max message length: 5");
+		doDeserialize(new ByteArraySingleTerminatorSerializer((byte) 0xfe),
+				"Terminator '0xfe' not found before max message length: 5");
 		doDeserialize(new ByteArrayStxEtxSerializer(), "Expected STX to begin message");
 		event = doDeserialize(new ByteArrayStxEtxSerializer(),
 				"Socket closed during message assembly", new byte[] {0x02, 0, 0}, 5);
@@ -325,15 +288,13 @@ public class DeserializationTests {
 		ByteArrayInputStream bais = new ByteArrayInputStream(data);
 		deser.setApplicationEventPublisher(anEvent -> event.set((TcpDeserializationExceptionEvent) anEvent));
 		deser.setMaxMessageSize(mms);
-		try {
-			deser.deserialize(bais);
-			fail("expected exception");
-		}
-		catch (Exception e) {
-			assertThat(event.get()).isNotNull();
-			assertThat(event.get().getCause()).isSameAs(e);
-			assertThat(e.getMessage()).contains(expectedMessage);
-		}
+		assertThatException()
+				.isThrownBy(() -> deser.deserialize(bais))
+				.withMessageContaining(expectedMessage)
+				.satisfies((ex) -> {
+					assertThat(event.get()).isNotNull();
+					assertThat(event.get().getCause()).isSameAs(ex);
+				});
 		return event.get();
 	}
 
@@ -350,6 +311,8 @@ public class DeserializationTests {
 	private void testTimeoutWhileDecoding(AbstractByteArraySerializer deserializer, String reply) {
 		ByteArrayRawSerializer serializer = new ByteArrayRawSerializer();
 		TcpNioServerConnectionFactory serverNio = new TcpNioServerConnectionFactory(0);
+		serverNio.setApplicationEventPublisher(event -> {
+		});
 		ByteArrayLengthHeaderSerializer lengthHeaderSerializer = new ByteArrayLengthHeaderSerializer(1);
 		serverNio.setDeserializer(lengthHeaderSerializer);
 		serverNio.setSerializer(serializer);
@@ -363,9 +326,11 @@ public class DeserializationTests {
 		in.start();
 		TestingUtilities.waitListening(serverNio, null);
 		TcpNioClientConnectionFactory clientNio = new TcpNioClientConnectionFactory("localhost", serverNio.getPort());
+		clientNio.setApplicationEventPublisher(event -> {
+		});
 		clientNio.setSerializer(serializer);
 		clientNio.setDeserializer(deserializer);
-		clientNio.setSoTimeout(1000);
+		clientNio.setSoTimeout(500);
 		clientNio.afterPropertiesSet();
 		final TcpOutboundGateway out = new TcpOutboundGateway();
 		out.setConnectionFactory(clientNio);
@@ -392,7 +357,7 @@ public class DeserializationTests {
 		assertThat(new String((byte[]) message.getPayload())).isEqualTo("Test");
 		String shortReply = reply.substring(0, reply.length() - 1);
 		((MessageChannel) message.getHeaders().getReplyChannel()).send(new GenericMessage<>(shortReply));
-		message = outputChannel.receive(1000);
+		message = outputChannel.receive(100);
 		assertThat(message).isNull();
 	}
 
@@ -403,6 +368,8 @@ public class DeserializationTests {
 		ByteArrayLengthHeaderSerializer lengthHeaderSerializer = new ByteArrayLengthHeaderSerializer(1);
 		serverNio.setDeserializer(lengthHeaderSerializer);
 		serverNio.setSerializer(serializer);
+		serverNio.setApplicationEventPublisher(event -> {
+		});
 		serverNio.afterPropertiesSet();
 		TcpInboundGateway in = new TcpInboundGateway();
 		in.setConnectionFactory(serverNio);
@@ -416,6 +383,8 @@ public class DeserializationTests {
 		clientNio.setSerializer(serializer);
 		clientNio.setDeserializer(new ByteArrayRawSerializer(true));
 		clientNio.setSoTimeout(1000);
+		clientNio.setApplicationEventPublisher(event -> {
+		});
 		clientNio.afterPropertiesSet();
 		final TcpOutboundGateway out = new TcpOutboundGateway();
 		out.setConnectionFactory(clientNio);

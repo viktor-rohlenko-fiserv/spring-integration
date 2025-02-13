@@ -16,11 +16,14 @@
 
 package org.springframework.integration.ip.dsl;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.integration.MessageTimeoutException;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.config.EnableIntegration;
@@ -47,6 +51,8 @@ import org.springframework.integration.ip.tcp.TcpReceivingChannelAdapter;
 import org.springframework.integration.ip.tcp.TcpSendingMessageHandler;
 import org.springframework.integration.ip.tcp.connection.AbstractClientConnectionFactory;
 import org.springframework.integration.ip.tcp.connection.AbstractServerConnectionFactory;
+import org.springframework.integration.ip.tcp.connection.CachingClientConnectionFactory;
+import org.springframework.integration.ip.tcp.connection.TcpConnectionOpenEvent;
 import org.springframework.integration.ip.tcp.connection.TcpConnectionServerListeningEvent;
 import org.springframework.integration.ip.tcp.connection.TcpNetClientConnectionFactory;
 import org.springframework.integration.ip.tcp.connection.TcpNetServerConnectionFactory;
@@ -55,12 +61,12 @@ import org.springframework.integration.ip.tcp.serializer.TcpCodecs;
 import org.springframework.integration.ip.udp.MulticastSendingMessageHandler;
 import org.springframework.integration.ip.udp.UdpServerListeningEvent;
 import org.springframework.integration.ip.udp.UnicastReceivingChannelAdapter;
-import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
 import org.springframework.integration.ip.util.TestingUtilities;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.integration.test.util.TestUtils;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.PollableChannel;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -101,9 +107,6 @@ public class IpIntegrationTests {
 
 	@Autowired
 	private UnicastReceivingChannelAdapter udpInbound;
-
-	@Autowired
-	private UnicastSendingMessageHandler udpOutbound;
 
 	@Autowired
 	private QueueChannel udpIn;
@@ -236,6 +239,48 @@ public class IpIntegrationTests {
 		assertThat(TestUtils.getPropertyValue(this.tcpOutAsync, "async", Boolean.class)).isTrue();
 	}
 
+	@Autowired
+	private AbstractServerConnectionFactory server2;
+
+	@Autowired
+	private TcpNetClientConnectionFactory client3;
+
+	@Autowired
+	@Qualifier("outboundFlow.input")
+	MessageChannel outboundFlowInput;
+
+	@Autowired
+	PollableChannel cachingRepliesChannel;
+
+	@Test
+	void allRepliesAreReceivedViaLimitedCachingConnectionFactory() {
+		this.client3.stop();
+		TestingUtilities.waitListening(this.server2, null);
+		this.client3.setPort(this.server2.getPort());
+		this.client3.start();
+
+		List<String> expected =
+				IntStream.rangeClosed('a', 'z')
+						.mapToObj((characterCode) -> (char) characterCode)
+						.map((character) -> "" + character)
+						.parallel()
+						.peek((character) -> this.outboundFlowInput.send(new GenericMessage<>(character)))
+						.map(String::toUpperCase)
+						.toList();
+
+		List<String> replies = new ArrayList<>();
+
+		for (int i = 0; i < expected.size(); i++) {
+			Message<?> replyMessage = this.cachingRepliesChannel.receive(10_000);
+			assertThat(replyMessage).isNotNull();
+			replies.add(replyMessage.getPayload().toString());
+		}
+
+		assertThat(replies).containsAll(expected);
+
+		assertThat(config.openEvents).hasSizeLessThanOrEqualTo(5);
+	}
+
 	@Configuration
 	@EnableIntegration
 	public static class Config {
@@ -318,8 +363,9 @@ public class IpIntegrationTests {
 		}
 
 		@Bean
-		public TcpNetClientConnectionFactorySpec client1(TcpNetServerConnectionFactory server1) {
-			return Tcp.netClient("localhost", server1.getPort())
+		public TcpNetClientConnectionFactorySpec client1() {
+			// The port from server is assigned
+			return Tcp.netClient("localhost", 0)
 					.serializer(TcpCodecs.crlf())
 					.deserializer(TcpCodecs.lengthHeader1());
 		}
@@ -337,8 +383,9 @@ public class IpIntegrationTests {
 		}
 
 		@Bean
-		public TcpNetClientConnectionFactorySpec client2(TcpNetServerConnectionFactory server1) {
-			return Tcp.netClient("localhost", server1.getPort())
+		public TcpNetClientConnectionFactorySpec client2() {
+			// The port from server is assigned
+			return Tcp.netClient("localhost", 0)
 					.serializer(TcpCodecs.crlf())
 					.deserializer(TcpCodecs.lengthHeader1());
 		}
@@ -368,6 +415,54 @@ public class IpIntegrationTests {
 			return f -> f
 					.handle(tcpOut, e -> e.advice(testAdvice()))
 					.transform(Transformers.objectToString());
+		}
+
+		@Bean
+		public TcpNetServerConnectionFactorySpec server2() {
+			return Tcp.netServer(0);
+		}
+
+		@Bean
+		public IntegrationFlow server2Flow(TcpNetServerConnectionFactory server2) {
+			return IntegrationFlow.from(Tcp.inboundGateway(server2))
+					.transform(Transformers.objectToString())
+					.<String, String>transform(String::toUpperCase)
+					.get();
+		}
+
+		@Bean
+		public TcpNetClientConnectionFactorySpec client3() {
+			// The port from server is assigned
+			return Tcp.netClient("localhost", 0);
+		}
+
+		final List<TcpConnectionOpenEvent> openEvents = new ArrayList<>();
+
+		@EventListener
+		void connectionOpened(TcpConnectionOpenEvent tcpConnectionOpenEvent) {
+			if ("client3".equals(tcpConnectionOpenEvent.getConnectionFactoryName())) {
+				this.openEvents.add(tcpConnectionOpenEvent);
+			}
+		}
+
+		@Bean
+		CachingClientConnectionFactory cachingClient(TcpNetClientConnectionFactory client3) {
+			var cachingClientConnectionFactory = new CachingClientConnectionFactory(client3, 5);
+			cachingClientConnectionFactory.setConnectionWaitTimeout(10_000);
+			return cachingClientConnectionFactory;
+		}
+
+		@Bean
+		IntegrationFlow outboundFlow(CachingClientConnectionFactory cachingClient) {
+			return (flow) -> flow.handle(Tcp.outboundAdapter(cachingClient));
+		}
+
+		@Bean
+		IntegrationFlow inboundFlow(CachingClientConnectionFactory cachingClient) {
+			return IntegrationFlow.from(Tcp.inboundAdapter(cachingClient))
+					.transform(Transformers.objectToString())
+					.channel((channels) -> channels.queue("cachingRepliesChannel"))
+					.get();
 		}
 
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.integration.aggregator;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -63,6 +64,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.core.DestinationResolutionException;
+import org.springframework.messaging.support.GenericMessage;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -80,7 +82,7 @@ import org.springframework.util.ObjectUtils;
  * {@link ReleaseStrategy}, and {@link MessageGroupProcessor} implementations as
  * you require.
  * <p>
- * By default the {@link CorrelationStrategy} will be a
+ * By default, the {@link CorrelationStrategy} will be a
  * {@link HeaderAttributeCorrelationStrategy} and the {@link ReleaseStrategy} will be a
  * {@link SequenceSizeReleaseStrategy}.
  * <p>
@@ -102,6 +104,7 @@ import org.springframework.util.ObjectUtils;
  * @author Enrique Rodriguez
  * @author Meherzad Lahewala
  * @author Jayadev Sirimamilla
+ * @author Ngoc Nhan
  *
  * @since 2.0
  */
@@ -127,6 +130,8 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 	private String discardChannelName;
 
 	private boolean sendPartialResultOnExpiry;
+
+	private boolean discardIndividuallyOnExpiry = true;
 
 	private boolean sequenceAware;
 
@@ -262,6 +267,18 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 	}
 
 	/**
+	 * Set to {@code false} to send to discard channel a whole expired group as a single message.
+	 * This option makes sense only if {@link #sendPartialResultOnExpiry} is set to {@code false} (default).
+	 * And also if {@link #discardChannel} is injected.
+	 * @param discardIndividuallyOnExpiry false to discard the whole group as one message.
+	 * @since 6.5
+	 * @see #sendPartialResultOnExpiry
+	 */
+	public void setDiscardIndividuallyOnExpiry(boolean discardIndividuallyOnExpiry) {
+		this.discardIndividuallyOnExpiry = discardIndividuallyOnExpiry;
+	}
+
+	/**
 	 * By default, when a MessageGroupStoreReaper is configured to expire partial
 	 * groups, empty groups are also removed. Empty groups exist after a group
 	 * is released normally. This is to enable the detection and discarding of
@@ -387,14 +404,14 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 				"'discardChannelName' and 'discardChannel' are mutually exclusive.");
 		BeanFactory beanFactory = getBeanFactory();
 		if (beanFactory != null) {
-			if (this.outputProcessor instanceof BeanFactoryAware) {
-				((BeanFactoryAware) this.outputProcessor).setBeanFactory(beanFactory);
+			if (this.outputProcessor instanceof BeanFactoryAware beanFactoryAware) {
+				beanFactoryAware.setBeanFactory(beanFactory);
 			}
-			if (this.correlationStrategy instanceof BeanFactoryAware) {
-				((BeanFactoryAware) this.correlationStrategy).setBeanFactory(beanFactory);
+			if (this.correlationStrategy instanceof BeanFactoryAware beanFactoryAware) {
+				beanFactoryAware.setBeanFactory(beanFactory);
 			}
-			if (this.releaseStrategy instanceof BeanFactoryAware) {
-				((BeanFactoryAware) this.releaseStrategy).setBeanFactory(beanFactory);
+			if (this.releaseStrategy instanceof BeanFactoryAware beanFactoryAware) {
+				beanFactoryAware.setBeanFactory(beanFactory);
 			}
 		}
 
@@ -422,8 +439,8 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 		this.lockRegistrySet = true;
 		this.forceReleaseProcessor = createGroupTimeoutProcessor();
 
-		if (this.releaseStrategy instanceof GroupConditionProvider) {
-			this.groupConditionSupplier = ((GroupConditionProvider) this.releaseStrategy).getGroupConditionSupplier();
+		if (this.releaseStrategy instanceof GroupConditionProvider groupConditionProvider) {
+			this.groupConditionSupplier = groupConditionProvider.getGroupConditionSupplier();
 		}
 	}
 
@@ -671,8 +688,8 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 		 */
 		if (groupTimeout != null) {
 			Date startTime = null;
-			if (groupTimeout instanceof Date) {
-				startTime = (Date) groupTimeout;
+			if (groupTimeout instanceof Date date) {
+				startTime = date;
 			}
 			else if ((Long) groupTimeout > 0) {
 				startTime = new Date(System.currentTimeMillis() + (Long) groupTimeout);
@@ -875,8 +892,17 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 			if (this.releaseLockBeforeSend) {
 				lock.unlock();
 			}
-			group.getMessages()
-					.forEach(this::discardMessage);
+			MessageChannel messageChannel = getDiscardChannel();
+			if (messageChannel != null) {
+				if (this.discardIndividuallyOnExpiry) {
+					group.getMessages()
+							.forEach(this::discardMessage);
+				}
+				else {
+					List<Message<?>> messagesInGroupToDiscard = new ArrayList<>(group.getMessages());
+					discardMessage(new GenericMessage<>(messagesInGroupToDiscard));
+				}
+			}
 		}
 		if (this.applicationEventPublisher != null) {
 			this.applicationEventPublisher.publishEvent(
@@ -903,8 +929,7 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 			this.logger.debug(() -> "Completing group with correlationKey [" + correlationKey + "]");
 
 			result = this.outputProcessor.processMessageGroup(group);
-			if (result instanceof Collection<?>) {
-				verifyResultCollectionConsistsOfMessages((Collection<?>) result);
+			if (isResultCollectionOfMessages(result)) {
 				partialSequence = (Collection<Message<?>>) result;
 			}
 
@@ -943,10 +968,24 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 
 	}
 
+	/**
+	 * Probably the method is {@code protected} by mistake.
+	 * @param elements the group processor result.
+	 * @deprecated without replacement - out of use from now on.
+	 */
+	@Deprecated(since = "6.5", forRemoval = true)
 	protected void verifyResultCollectionConsistsOfMessages(Collection<?> elements) {
 		Class<?> commonElementType = CollectionUtils.findCommonElementType(elements);
 		Assert.isAssignable(Message.class, commonElementType, () ->
 				"The expected collection of Messages contains non-Message element: " + commonElementType);
+	}
+
+	private static boolean isResultCollectionOfMessages(Object result) {
+		if (result instanceof Collection<?> resultCollection) {
+			Class<?> commonElementType = CollectionUtils.findCommonElementType(resultCollection);
+			return commonElementType != null && Message.class.isAssignableFrom(commonElementType);
+		}
+		return false;
 	}
 
 	protected Object obtainGroupTimeout(MessageGroup group) {
@@ -976,11 +1015,11 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 	public void start() {
 		if (!this.running) {
 			this.running = true;
-			if (this.outputProcessor instanceof Lifecycle) {
-				((Lifecycle) this.outputProcessor).start();
+			if (this.outputProcessor instanceof Lifecycle lifecycle) {
+				lifecycle.start();
 			}
-			if (this.releaseStrategy instanceof Lifecycle) {
-				((Lifecycle) this.releaseStrategy).start();
+			if (this.releaseStrategy instanceof Lifecycle lifecycle) {
+				lifecycle.start();
 			}
 			if (this.expireTimeout > 0) {
 				purgeOrphanedGroups();
@@ -996,11 +1035,11 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 	public void stop() {
 		if (this.running) {
 			this.running = false;
-			if (this.outputProcessor instanceof Lifecycle) {
-				((Lifecycle) this.outputProcessor).stop();
+			if (this.outputProcessor instanceof Lifecycle lifecycle) {
+				lifecycle.stop();
 			}
-			if (this.releaseStrategy instanceof Lifecycle) {
-				((Lifecycle) this.releaseStrategy).stop();
+			if (this.releaseStrategy instanceof Lifecycle lifecycle) {
+				lifecycle.stop();
 			}
 		}
 	}
@@ -1033,8 +1072,8 @@ public abstract class AbstractCorrelatingMessageHandler extends AbstractMessageP
 			 */
 			super(messageGroup.getMessages(), null, messageGroup.getGroupId(), messageGroup.getTimestamp(),
 					messageGroup.isComplete(), true);
-			if (messageGroup instanceof SimpleMessageGroup) {
-				this.sourceGroup = (SimpleMessageGroup) messageGroup;
+			if (messageGroup instanceof SimpleMessageGroup simpleMessageGroup) {
+				this.sourceGroup = simpleMessageGroup;
 			}
 			else {
 				this.sourceGroup = null;

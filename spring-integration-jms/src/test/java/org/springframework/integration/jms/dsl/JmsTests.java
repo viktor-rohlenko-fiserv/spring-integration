@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,14 +167,14 @@ public class JmsTests extends ActiveMQMultiContextTests {
 
 	@Test
 	public void testPollingFlow() {
-		this.controlBus.send("@'integerMessageSource.inboundChannelAdapter'.start()");
+		this.controlBus.send("'integerMessageSource.inboundChannelAdapter'.start");
 		assertThat(this.beanFactory.getBean("integerChannel")).isInstanceOf(FixedSubscriberChannel.class);
 		for (int i = 0; i < 5; i++) {
 			Message<?> message = this.outputChannel.receive(20000);
 			assertThat(message).isNotNull();
 			assertThat(message.getPayload()).isEqualTo("" + i);
 		}
-		this.controlBus.send("@'integerMessageSource.inboundChannelAdapter'.stop()");
+		this.controlBus.send("'integerMessageSource.inboundChannelAdapter'.stop");
 
 		assertThat(((InterceptableChannel) this.outputChannel).getInterceptors())
 				.contains(this.testChannelInterceptor);

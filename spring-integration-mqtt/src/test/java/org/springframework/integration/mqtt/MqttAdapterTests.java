@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -182,7 +182,7 @@ public class MqttAdapterTests {
 			assertThat(new String(message.getPayload())).isEqualTo("Hello, world!");
 			publishCalled.set(true);
 			return deliveryToken;
-		}).given(client).publish(anyString(), any(MqttMessage.class));
+		}).given(client).publish(anyString(), any(), any(), any());
 
 		handler.handleMessage(new GenericMessage<>("Hello, world!"));
 
@@ -204,7 +204,7 @@ public class MqttAdapterTests {
 		given(clientManager.getClient()).willReturn(client);
 
 		var deliveryToken = mock(MqttDeliveryToken.class);
-		given(client.publish(anyString(), any(MqttMessage.class))).willReturn(deliveryToken);
+		given(client.publish(anyString(), any(), any(), any())).willReturn(deliveryToken);
 
 		var handler = new MqttPahoMessageHandler(clientManager);
 		handler.setDefaultTopic("mqtt-foo");
@@ -218,7 +218,7 @@ public class MqttAdapterTests {
 
 		// then
 		verify(client, never()).connect(any(MqttConnectOptions.class));
-		verify(client).publish(anyString(), any(MqttMessage.class));
+		verify(client).publish(anyString(), any(), any(), any());
 		verify(client, never()).disconnect();
 		verify(client, never()).disconnect(anyLong());
 		verify(client, never()).close();
@@ -488,8 +488,8 @@ public class MqttAdapterTests {
 		given(token.getGrantedQos()).willReturn(new int[] {2, 0});
 		willReturn(token).given(client).subscribe(any(String[].class), any(int[].class), any());
 
-		MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter("foo", "bar", factory,
-				"baz", "fix");
+		MqttPahoMessageDrivenChannelAdapter adapter =
+				new MqttPahoMessageDrivenChannelAdapter("tcp://mqtt.host", "bar", factory, "baz", "fix");
 		AtomicReference<Method> method = new AtomicReference<>();
 		ReflectionUtils.doWithMethods(MqttPahoMessageDrivenChannelAdapter.class, m -> {
 			m.setAccessible(true);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 the original author or authors.
+ * Copyright 2020-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -278,6 +278,16 @@ class KotlinIntegrationFlowDefinition(@PublishedApi internal val delegate: Integ
 	 */
 	fun wireTap(wireTapSpec: WireTapSpec) {
 		this.delegate.wireTap(wireTapSpec)
+	}
+
+	/**
+	 * Populate the `Control Bus` EI Pattern specific [MessageHandler] implementation
+	 * at the current [IntegrationFlow] chain position.
+	 * @since 6.4
+	 */
+	@Deprecated("Use 'controlBus()' instead.", replaceWith = ReplaceWith("controlBus()"))
+	fun controlBusOnRegistry(endpointConfigurer: GenericEndpointSpec<ServiceActivatingHandler>.() -> Unit = {}) {
+		controlBus(endpointConfigurer)
 	}
 
 	/**

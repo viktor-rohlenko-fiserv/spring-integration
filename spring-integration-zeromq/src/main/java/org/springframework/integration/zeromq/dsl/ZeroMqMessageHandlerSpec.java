@@ -36,6 +36,7 @@ import org.springframework.messaging.converter.MessageConverter;
  * The {@link ReactiveMessageHandlerSpec} extension for {@link ZeroMqMessageHandler}.
  *
  * @author Artem Bilan
+ * @author Alessio Matricardi
  *
  * @since 5.4
  */
@@ -49,6 +50,26 @@ public class ZeroMqMessageHandlerSpec
 	 */
 	protected ZeroMqMessageHandlerSpec(ZContext context, String connectUrl) {
 		this(context, () -> connectUrl);
+	}
+
+	/**
+	 * Create an instance based on the provided {@link ZContext}.
+	 * The created socket will be bound to a random port.
+	 * @param context the {@link ZContext} to use for creating sockets.
+	 * @since 6.4
+	 */
+	protected ZeroMqMessageHandlerSpec(ZContext context) {
+		this(context, SocketType.PAIR);
+	}
+
+	/**
+	 * Create an instance based on the provided {@link ZContext} and binding port.
+	 * @param context the {@link ZContext} to use for creating sockets.
+	 * @param port the port to bind ZeroMq socket to over TCP.
+	 * @since 6.4
+	 */
+	protected ZeroMqMessageHandlerSpec(ZContext context, int port) {
+		this(context, port, SocketType.PAIR);
 	}
 
 	/**
@@ -70,6 +91,30 @@ public class ZeroMqMessageHandlerSpec
 	 */
 	protected ZeroMqMessageHandlerSpec(ZContext context, String connectUrl, SocketType socketType) {
 		this(context, () -> connectUrl, socketType);
+	}
+
+	/**
+	 * Create an instance based on the provided {@link ZContext} and {@link SocketType}.
+	 * The created socket will be bound to a random port.
+	 * @param context the {@link ZContext} to use for creating sockets.
+	 * @param socketType the {@link SocketType} to use;
+	 *    only {@link SocketType#PAIR}, {@link SocketType#PUB} and {@link SocketType#PUSH} are supported.
+	 * @since 6.4
+	 */
+	protected ZeroMqMessageHandlerSpec(ZContext context, SocketType socketType) {
+		super(new ZeroMqMessageHandler(context, socketType));
+	}
+
+	/**
+	 * Create an instance based on the provided {@link ZContext}, binding port and {@link SocketType}.
+	 * @param context the {@link ZContext} to use for creating sockets.
+	 * @param port the port to bind ZeroMq socket to over TCP.
+	 * @param socketType the {@link SocketType} to use;
+	 *    only {@link SocketType#PAIR}, {@link SocketType#PUB} and {@link SocketType#PUSH} are supported.
+	 * @since 6.4
+	 */
+	protected ZeroMqMessageHandlerSpec(ZContext context, int port, SocketType socketType) {
+		super(new ZeroMqMessageHandler(context, port, socketType));
 	}
 
 	/**
@@ -123,6 +168,20 @@ public class ZeroMqMessageHandlerSpec
 	 */
 	public ZeroMqMessageHandlerSpec topic(String topic) {
 		this.reactiveMessageHandler.setTopic(topic);
+		return this;
+	}
+
+	/**
+	 * Specify if the topic that {@link SocketType#PUB} socket is going to use for distributing messages into the
+	 * subscriptions must be wrapped with an additional empty frame.
+	 * It is ignored for all other {@link SocketType}s supported.
+	 * This attribute is set to {@code true} by default.
+	 * @param wrapTopic true if the topic must be wrapped with an additional empty frame.
+	 * @return the spec
+	 * @since 6.2.6
+	 */
+	public ZeroMqMessageHandlerSpec wrapTopic(boolean wrapTopic) {
+		this.reactiveMessageHandler.wrapTopic(wrapTopic);
 		return this;
 	}
 

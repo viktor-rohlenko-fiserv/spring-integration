@@ -74,6 +74,7 @@ import org.springframework.util.StringUtils;
  * @author Oleg Zhurakousky
  * @author Gary Russell
  * @author Artem Bilan
+ * @author Ngoc Nhan
  *
  * @since 2.0
  */
@@ -137,7 +138,7 @@ public abstract class AbstractInboundFileSynchronizer<F>
 	 */
 	public AbstractInboundFileSynchronizer(SessionFactory<F> sessionFactory) {
 		Assert.notNull(sessionFactory, "sessionFactory must not be null");
-		this.remoteFileTemplate = new RemoteFileTemplate<F>(sessionFactory);
+		this.remoteFileTemplate = new RemoteFileTemplate<>(sessionFactory);
 	}
 
 	@Nullable
@@ -312,8 +313,8 @@ public abstract class AbstractInboundFileSynchronizer<F>
 
 	@Override
 	public void close() throws IOException {
-		if (this.filter instanceof Closeable) {
-			((Closeable) this.filter).close();
+		if (this.filter instanceof Closeable closeable) {
+			closeable.close();
 		}
 	}
 
@@ -441,7 +442,7 @@ public abstract class AbstractInboundFileSynchronizer<F>
 		}
 	}
 
-	protected boolean copyFileToLocalDirectory(String remoteDirectoryPath, // NOSONAR
+	protected boolean copyFileToLocalDirectory(@Nullable String remoteDirectoryPath, // NOSONAR
 			@Nullable EvaluationContext localFileEvaluationContext, F remoteFile, File localDirectory,
 			Session<F> session) throws IOException {
 
@@ -500,9 +501,15 @@ public abstract class AbstractInboundFileSynchronizer<F>
 				String host = hostPort.substring(0, colonIndex);
 				String port = hostPort.substring(colonIndex + 1);
 				try {
+					String remoteDir = "/";
+					if (remoteDirectoryPath != null) {
+						remoteDir =
+								remoteDirectoryPath.charAt(0) == '/'
+										? remoteDirectoryPath :
+										'/' + remoteDirectoryPath;
+					}
 					String remoteFileMetadata =
-							new URI(protocol(), null, host, Integer.parseInt(port),
-									'/' + remoteDirectoryPath, null, remoteFileName)
+							new URI(protocol(), null, host, Integer.parseInt(port), remoteDir, null, remoteFileName)
 									.toString();
 					this.remoteFileMetadataStore.put(buildMetadataKey(localFile), remoteFileMetadata);
 				}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ import org.springframework.integration.transaction.PassThroughTransactionSynchro
 import org.springframework.integration.transaction.TransactionSynchronizationFactory;
 import org.springframework.integration.util.ErrorHandlingTaskExecutor;
 import org.springframework.jmx.export.annotation.ManagedAttribute;
+import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -81,6 +82,7 @@ import org.springframework.util.ReflectionUtils;
  * @author Artem Bilan
  * @author Andreas Baer
  * @author Christian Tzolov
+ * @author Ngoc Nhan
  */
 public abstract class AbstractPollingEndpoint extends AbstractEndpoint implements BeanClassLoaderAware {
 
@@ -187,8 +189,8 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 	 * @since 4.3
 	 */
 	public MessageChannel getDefaultErrorChannel() {
-		if (!this.errorHandlerIsDefault && this.errorHandler instanceof MessagePublishingErrorHandler) {
-			return ((MessagePublishingErrorHandler) this.errorHandler).getDefaultErrorChannel();
+		if (!this.errorHandlerIsDefault && this.errorHandler instanceof MessagePublishingErrorHandler messagePublishingErrorHandler) {
+			return messagePublishingErrorHandler.getDefaultErrorChannel();
 		}
 		else {
 			return null;
@@ -415,10 +417,12 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 	}
 
 	private Message<?> pollForMessage() {
+		Exception pollingTaskError = null;
 		try {
 			return this.pollingTask.call();
 		}
 		catch (Exception ex) {
+			pollingTaskError = ex;
 			if (ex instanceof MessagingException) { // NOSONAR
 				throw (MessagingException) ex;
 			}
@@ -440,6 +444,7 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 					TransactionSynchronizationManager.unbindResource(resource);
 				}
 			}
+			donePollingTask(pollingTaskError);
 		}
 	}
 
@@ -470,7 +475,7 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 		return message;
 	}
 
-	private void messageReceived(IntegrationResourceHolder holder, Message<?> message) {
+	protected void messageReceived(@Nullable IntegrationResourceHolder holder, Message<?> message) {
 		this.logger.debug(() -> "Poll resulted in Message: " + message);
 		if (holder != null) {
 			holder.setMessage(message);
@@ -487,6 +492,10 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 				throw new MessagingException(message, ex);
 			}
 		}
+	}
+
+	protected void donePollingTask(@Nullable Exception pollingTaskError) {
+
 	}
 
 	@Override // guarded by super#lifecycleLock
@@ -535,6 +544,7 @@ public abstract class AbstractPollingEndpoint extends AbstractEndpoint implement
 		return null;
 	}
 
+	@Nullable
 	private IntegrationResourceHolder bindResourceHolderIfNecessary(String key, Object resource) {
 		if (this.transactionSynchronizationFactory != null && resource != null &&
 				TransactionSynchronizationManager.isActualTransactionActive()) {

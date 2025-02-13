@@ -119,6 +119,9 @@ If the `receiveRaw` option is set to `true`, a `ZMsg`, consumed from the socket,
 Otherwise, an `InboundMessageMapper` is used to convert the consumed data into a `Message`.
 If the received `ZMsg` is multi-frame, the first frame is treated as the `ZeroMqHeaders.TOPIC` header this ZeroMQ message was published to.
 
+If the `unwrapTopic` option is set to `false`, the incoming message is considered to consist of two frames: the topic and the ZeroMQ message.
+Otherwise, by default, the `ZMsg` is considered to consist of three frames: the first one containing the topic, the last frame containing the message, with an empty frame in the middle.
+
 With `SocketType.SUB`, the `ZeroMqMessageProducer` uses the provided `topics` option for subscriptions; defaults to subscribe to all.
 Subscriptions can be adjusted at runtime using `subscribeToTopics()` and `unsubscribeFromTopics()` `@ManagedOperation` s.
 
@@ -143,15 +146,21 @@ ZeroMqMessageProducer zeroMqMessageProducer(ZContext context, MessageChannel out
 
 The `ZeroMqMessageHandler` is a `ReactiveMessageHandler` implementation to produce publish messages into a ZeroMQ socket.
 Only `SocketType.PAIR`, `SocketType.PUSH` and `SocketType.PUB` are supported.
-The `ZeroMqMessageHandler` only supports connecting the ZeroMQ socket; binding is not supported.
+This component can connect to the remote socket or bind onto TCP protocol with the provided or random port.
+The actual port can be obtained via `getBoundPort()` after this component is started and ZeroMQ socket is bound.
+
 When the `SocketType.PUB` is used, the `topicExpression` is evaluated against a request message to inject a topic frame into a ZeroMQ message if it is not null.
 The subscriber side (`SocketType.SUB`) must receive the topic frame first before parsing the actual data.
+
+If the `wrapTopic` option is set to `false`, the ZeroMQ message frame is sent after the injected topic, if present.
+By default, an additional empty frame is sent between the topic and the message.
+
 When the payload of the request message is a `ZMsg`, no conversion or topic extraction is performed: the `ZMsg` is sent into a socket as is and it is not destroyed for possible further reuse.
 Otherwise, an `OutboundMessageMapper<byte[]>` is used to convert a request message (or just its payload) into a ZeroMQ frame to publish.
 By default, a `ConvertingBytesMessageMapper` is used supplied with a `ConfigurableCompositeMessageConverter`.
 The socket options (e.g. security or write timeout) can be configured via `setSocketConfigurer(Consumer<ZMQ.Socket> socketConfigurer)` callback.
 
-Here is a sample of `ZeroMqMessageHandler` configuration:
+Here is a sample of `ZeroMqMessageHandler` configuration which connect to a socket:
 
 [source,java]
 ----
@@ -160,6 +169,21 @@ Here is a sample of `ZeroMqMessageHandler` configuration:
 ZeroMqMessageHandler zeroMqMessageHandler(ZContext context) {
     ZeroMqMessageHandler messageHandler =
                   new ZeroMqMessageHandler(context, "tcp://localhost:6060", SocketType.PUB);
+    messageHandler.setTopicExpression(
+                  new FunctionExpression<Message<?>>((message) -> message.getHeaders().get("topic")));
+    messageHandler.setMessageMapper(new EmbeddedJsonHeadersMessageMapper());
+}
+----
+
+Here is a sample of `ZeroMqMessageHandler` configuration which bind to a provided port:
+
+[source,java]
+----
+@Bean
+@ServiceActivator(inputChannel = "zeroMqPublisherChannel")
+ZeroMqMessageHandler zeroMqMessageHandler(ZContext context) {
+    ZeroMqMessageHandler messageHandler =
+                  new ZeroMqMessageHandler(context, 7070, SocketType.PUB);
     messageHandler.setTopicExpression(
                   new FunctionExpression<Message<?>>((message) -> message.getHeaders().get("topic")));
     messageHandler.setMessageMapper(new EmbeddedJsonHeadersMessageMapper());

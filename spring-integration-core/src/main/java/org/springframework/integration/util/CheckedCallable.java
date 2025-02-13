@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2023-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package org.springframework.integration.util;
+
+import java.util.concurrent.Callable;
 
 /**
  * A Callable-like interface which allows throwing any Throwable.
@@ -32,10 +34,15 @@ public interface CheckedCallable<T, E extends Throwable> {
 
 	T call() throws E;
 
-	default Runnable unchecked() {
+	/**
+	 * Wrap the {@link #call()} into unchecked {@link Callable}.
+	 * Re-throw its exception wrapped with a {@link IllegalStateException}.
+	 * @return the unchecked {@link Callable}.
+	 */
+	default Callable<T> unchecked() {
 		return () -> {
 			try {
-				call();
+				return call();
 			}
 			catch (Throwable t) { // NOSONAR
 				if (t instanceof RuntimeException runtimeException) { // NOSONAR
@@ -49,6 +56,18 @@ public interface CheckedCallable<T, E extends Throwable> {
 				}
 			}
 		};
+	}
+
+	/**
+	 * Wrap the {@link #call()} into unchecked {@link Callable}.
+	 * Re-throw its exception wrapped with a {@link IllegalStateException}.
+	 * @return the unchecked {@link Callable}.
+	 * @since 6.3.7
+	 * @deprecated since 6.5 in favor of {@link #unchecked()}.
+	 */
+	@Deprecated(since = "6.5", forRemoval = true)
+	default Callable<T> uncheckedCallable() {
+		return unchecked();
 	}
 
 }

@@ -19,6 +19,7 @@ package org.springframework.integration.jdbc.channel;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -192,7 +193,7 @@ public final class PostgresChannelMessageTableSubscriber implements SmartLifecyc
 				try {
 					PgConnection conn = this.connectionSupplier.get();
 					try (Statement stmt = conn.createStatement()) {
-						stmt.execute("LISTEN " + this.tablePrefix.toLowerCase() + "channel_message_notify");
+						stmt.execute("LISTEN " + this.tablePrefix.toLowerCase(Locale.ROOT) + "channel_message_notify");
 					}
 					catch (Exception ex) {
 						try {
@@ -216,9 +217,10 @@ public final class PostgresChannelMessageTableSubscriber implements SmartLifecyc
 							if (!isActive()) {
 								return;
 							}
-							if (notifications == null || notifications.length == 0) {
+							if ((notifications == null || notifications.length == 0) && !conn.isValid(1)) {
 								//We did not receive any notifications within the timeout period.
-								//We will close the connection and re-establish it.
+								//If the connection is still valid, we will continue polling
+								//Otherwise, we will close the connection and re-establish it.
 								break;
 							}
 							for (PGNotification notification : notifications) {

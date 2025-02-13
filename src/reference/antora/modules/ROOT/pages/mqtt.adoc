@@ -27,6 +27,7 @@ compile "org.springframework.integration:spring-integration-mqtt:{project-versio
 ======
 
 The current implementation uses the https://www.eclipse.org/paho/[Eclipse Paho MQTT Client] library.
+Starting with version 6.5, the `org.eclipse.paho:org.eclipse.paho.client.mqttv3` dependency is an `optional` dependency, so has to be included explicitly in the target project for MQTT v3 support.
 
 IMPORTANT: The XML configuration and most of this chapter are about MQTT v3.1 protocol support and respective Paho Client.
 See xref:mqtt.adoc#mqtt-v5[MQTT v5 Support] paragraph for respective protocol support.
@@ -382,9 +383,9 @@ public class MqttJavaApplication {
             .run(args);
     }
 
-   	@Bean
-   	public IntegrationFlow mqttOutboundFlow() {
-   	    return f -> f.handle(new MqttPahoMessageHandler("tcp://host1:1883", "someMqttClient"));
+       @Bean
+       public IntegrationFlow mqttOutboundFlow() {
+           return f -> f.handle(new MqttPahoMessageHandler("tcp://host1:1883", "someMqttClient"));
     }
 
 }
@@ -399,6 +400,7 @@ Certain application events are published by the adapters.
 For the MQTT v5 Paho client, this event is also emitted when the server performs a normal disconnection, in which case the `cause` of the lost connection is `null`.
 * `MqttMessageSentEvent` - published by the outbound adapter when a message has been sent, if running in asynchronous mode.
 * `MqttMessageDeliveredEvent` - published by the outbound adapter when the client indicates that a message has been delivered, if running in asynchronous mode.
+* `MqttMessageNotDeliveredEvent` - published by the outbound adapter when the client indicates that a message has not been delivered, if running in asynchronous mode.
 * `MqttSubscribedEvent` - published by the inbound adapter after subscribing to the topics.
 
 These events can be received by an `ApplicationListener<MqttIntegrationEvent>` or with an `@EventListener` method.
@@ -546,5 +548,21 @@ public IntegrationFlow mqttOutFlow(
         ClientManager<IMqttAsyncClient, MqttConnectionOptions> clientManager) {
 
     return f -> f.handle(new Mqttv5PahoMessageHandler(clientManager));
+}
+----
+
+NOTE: Starting with version 6.4, multiple instances of `MqttPahoMessageDrivenChannelAdapter` and `Mqttv5PahoMessageDrivenChannelAdapter` can now be added at runtime using corresponding `ClientManager` through `IntegrationFlowContext`
+
+[source,java]
+----
+private void addAddRuntimeAdapter(IntegrationFlowContext flowContext, Mqttv5ClientManager clientManager,
+                                  String topic, MessageChannel channel) {
+    flowContext
+        .registration(
+            IntegrationFlow
+                .from(new Mqttv5PahoMessageDrivenChannelAdapter(clientManager, topic))
+                .channel(channel)
+                .get())
+        .register();
 }
 ----

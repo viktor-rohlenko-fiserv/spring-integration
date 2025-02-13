@@ -18,6 +18,7 @@ package org.springframework.integration.core;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +44,6 @@ import static org.awaitility.Awaitility.await;
 /**
  * @author Mark Fisher
  * @author Artem Bilan
- *
  * @since 2.0
  */
 public class AsyncMessagingTemplateTests {
@@ -148,8 +148,8 @@ public class AsyncMessagingTemplateTests {
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		template.setDefaultDestination(channel);
 		Future<Message<?>> result = template.asyncReceive();
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(100000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 		assertThat(result.get().getPayload()).isEqualTo("test");
@@ -161,8 +161,8 @@ public class AsyncMessagingTemplateTests {
 		QueueChannel channel = new QueueChannel();
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		Future<Message<?>> result = template.asyncReceive(channel);
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(10000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 		assertThat(result.get().getPayload()).isEqualTo("test");
@@ -178,8 +178,8 @@ public class AsyncMessagingTemplateTests {
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		template.setBeanFactory(context);
 		Future<Message<?>> result = template.asyncReceive("testChannel");
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(10000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 
@@ -201,8 +201,8 @@ public class AsyncMessagingTemplateTests {
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		template.setDefaultDestination(channel);
 		Future<?> result = template.asyncReceiveAndConvert();
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(10000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 		assertThat(result.get()).isEqualTo("test");
@@ -215,8 +215,8 @@ public class AsyncMessagingTemplateTests {
 		QueueChannel channel = new QueueChannel();
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		Future<?> result = template.asyncReceiveAndConvert(channel);
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(10000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 		assertThat(result.get()).isEqualTo("test");
@@ -233,8 +233,8 @@ public class AsyncMessagingTemplateTests {
 		AsyncMessagingTemplate template = new AsyncMessagingTemplate();
 		template.setBeanFactory(context);
 		Future<?> result = template.asyncReceiveAndConvert("testChannel");
-		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		long start = System.currentTimeMillis();
+		sendMessageAfterDelay(channel, new GenericMessage<>("test"), 200);
 		assertThat(result.get(10000, TimeUnit.MILLISECONDS)).isNotNull();
 		long elapsed = System.currentTimeMillis() - start;
 
@@ -432,17 +432,18 @@ public class AsyncMessagingTemplateTests {
 	}
 
 	private static void sendMessageAfterDelay(MessageChannel channel, GenericMessage<String> message, int delay) {
-		Executors.newSingleThreadExecutor()
-				.execute(() -> {
-					try {
-						Thread.sleep(delay);
-					}
-					catch (InterruptedException e) {
-						Thread.currentThread().interrupt();
-						return;
-					}
-					channel.send(message);
-				});
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		executorService.execute(() -> {
+			try {
+				Thread.sleep(delay);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+			channel.send(message);
+		});
+		executorService.shutdown();
 	}
 
 	private static class EchoHandler extends AbstractReplyProducingMessageHandler {

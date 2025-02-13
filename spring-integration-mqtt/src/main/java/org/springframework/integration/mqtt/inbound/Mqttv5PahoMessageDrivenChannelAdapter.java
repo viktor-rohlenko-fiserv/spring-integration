@@ -19,15 +19,14 @@ package org.springframework.integration.mqtt.inbound;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
 
 import org.eclipse.paho.mqttv5.client.IMqttAsyncClient;
-import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
 import org.eclipse.paho.mqttv5.client.MqttAsyncClient;
 import org.eclipse.paho.mqttv5.client.MqttCallback;
@@ -53,6 +52,7 @@ import org.springframework.integration.mqtt.event.MqttSubscribedEvent;
 import org.springframework.integration.mqtt.support.MqttHeaderMapper;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.integration.mqtt.support.MqttMessageConverter;
+import org.springframework.integration.mqtt.support.MqttUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
@@ -107,8 +107,6 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 	private HeaderMapper<MqttProperties> headerMapper = new MqttHeaderMapper();
 
 	private volatile boolean readyToSubscribeOnStart;
-
-	private final AtomicInteger subscriptionIdentifierCounter = new AtomicInteger(0);
 
 	/**
 	 * Create an instance based on the MQTT url, client id and subscriptions.
@@ -292,13 +290,16 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 		try {
 			if (this.mqttClient != null && this.mqttClient.isConnected()) {
 				if (this.connectionOptions.isCleanStart()) {
-					this.mqttClient.unsubscribe(topics).waitForCompletion(getCompletionTimeout());
+					unsubscribe(topics);
 					// Have to re-subscribe on next start if connection is not lost.
 					this.readyToSubscribeOnStart = true;
 
 				}
 				if (getClientManager() == null) {
 					this.mqttClient.disconnectForcibly(getDisconnectCompletionTimeout());
+					if (getConnectionInfo().isAutomaticReconnect()) {
+						MqttUtils.stopClientReconnectCycle(this.mqttClient);
+					}
 				}
 			}
 		}
@@ -310,12 +311,22 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 		}
 	}
 
+	private void unsubscribe(String... topics) throws MqttException {
+		try {
+			// Catch ConcurrentModificationException: https://github.com/eclipse/paho.mqtt.java/issues/986
+			this.mqttClient.unsubscribe(topics).waitForCompletion(getCompletionTimeout());
+		}
+		catch (ConcurrentModificationException ex) {
+			logger.error(ex, () -> "Error unsubscribing from " + Arrays.toString(topics));
+		}
+	}
+
 	@Override
 	public void destroy() {
 		super.destroy();
 		try {
 			if (getClientManager() == null && this.mqttClient != null) {
-				this.mqttClient.close(true);
+				this.mqttClient.close();
 			}
 		}
 		catch (MqttException ex) {
@@ -340,9 +351,10 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 			}
 			if (this.mqttClient != null && this.mqttClient.isConnected()) {
 				MqttProperties subscriptionProperties = new MqttProperties();
-				subscriptionProperties.setSubscriptionIdentifier(this.subscriptionIdentifierCounter.incrementAndGet());
+				// Make use of mqttSession.getNextSubscriptionIdentifier() if available in connection
+				subscriptionProperties.setSubscriptionIdentifiers(List.of(0));
 				this.mqttClient.subscribe(new MqttSubscription[] {subscription},
-								null, null, new IMqttMessageListener[] {this::messageArrived}, subscriptionProperties)
+								null, null, this::messageArrived, subscriptionProperties)
 						.waitForCompletion(getCompletionTimeout());
 			}
 		}
@@ -359,7 +371,7 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 		this.topicLock.lock();
 		try {
 			if (this.mqttClient != null && this.mqttClient.isConnected()) {
-				this.mqttClient.unsubscribe(topic).waitForCompletion(getCompletionTimeout());
+				unsubscribe(topic);
 			}
 			super.removeTopic(topic);
 			if (!CollectionUtils.isEmpty(this.subscriptions)) {
@@ -468,15 +480,10 @@ public class Mqttv5PahoMessageDrivenChannelAdapter
 		ApplicationEventPublisher applicationEventPublisher = getApplicationEventPublisher();
 		this.topicLock.lock();
 		try {
-			IMqttMessageListener listener = this::messageArrived;
-			IMqttMessageListener[] listeners = IntStream.range(0, mqttSubscriptions.length)
-					.mapToObj(t -> listener)
-					.toArray(IMqttMessageListener[]::new);
 			MqttProperties subscriptionProperties = new MqttProperties();
-			subscriptionProperties.setSubscriptionIdentifiers(IntStream.range(0, mqttSubscriptions.length)
-					.mapToObj(i -> this.subscriptionIdentifierCounter.incrementAndGet())
-					.toList());
-			this.mqttClient.subscribe(mqttSubscriptions, null, null, listeners, subscriptionProperties)
+			// Make use of mqttSession.getNextSubscriptionIdentifier() if available in connection
+			subscriptionProperties.setSubscriptionIdentifiers(List.of(0));
+			this.mqttClient.subscribe(mqttSubscriptions, null, null, this::messageArrived, subscriptionProperties)
 					.waitForCompletion(getCompletionTimeout());
 			String message = "Connected and subscribed to " + Arrays.toString(mqttSubscriptions);
 			logger.debug(message);

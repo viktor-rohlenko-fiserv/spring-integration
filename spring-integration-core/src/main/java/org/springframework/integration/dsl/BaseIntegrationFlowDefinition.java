@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,6 @@ import org.springframework.integration.core.MessageProducer;
 import org.springframework.integration.core.MessageSelector;
 import org.springframework.integration.dsl.support.FixedSubscriberChannelPrototype;
 import org.springframework.integration.dsl.support.MessageChannelReference;
-import org.springframework.integration.expression.ControlBusMethodFilter;
 import org.springframework.integration.expression.FunctionExpression;
 import org.springframework.integration.filter.ExpressionEvaluatingSelector;
 import org.springframework.integration.filter.MessageFilter;
@@ -60,8 +59,8 @@ import org.springframework.integration.filter.MethodInvokingSelector;
 import org.springframework.integration.handler.AbstractMessageProducingHandler;
 import org.springframework.integration.handler.BeanNameMessageProcessor;
 import org.springframework.integration.handler.BridgeHandler;
+import org.springframework.integration.handler.ControlBusMessageProcessor;
 import org.springframework.integration.handler.DelayHandler;
-import org.springframework.integration.handler.ExpressionCommandMessageProcessor;
 import org.springframework.integration.handler.LambdaMessageProcessor;
 import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.handler.MessageProcessor;
@@ -112,6 +111,7 @@ import org.springframework.util.StringUtils;
  * @author Gary Russell
  * @author Gabriele Del Prete
  * @author Tim Feuerbach
+ * @author Ngoc Nhan
  *
  * @since 5.2.1
  *
@@ -517,7 +517,34 @@ public abstract class BaseIntegrationFlowDefinition<B extends BaseIntegrationFlo
 	 * Populate the {@code Control Bus} EI Pattern specific {@link MessageHandler} implementation
 	 * at the current {@link IntegrationFlow} chain position.
 	 * @return the current {@link BaseIntegrationFlowDefinition}.
-	 * @see ExpressionCommandMessageProcessor
+	 * @since 6.4
+	 * @deprecated since 6.5 in favor of {@link #controlBus()}
+	 * @see ControlBusMessageProcessor
+	 */
+	@Deprecated(since = "6.5", forRemoval = true)
+	public B controlBusOnRegistry() {
+		return controlBus();
+	}
+
+	/**
+	 * Populate the {@code Control Bus} EI Pattern specific {@link MessageHandler} implementation
+	 * at the current {@link IntegrationFlow} chain position.
+	 * @param endpointConfigurer the {@link Consumer} to accept integration endpoint options.
+	 * @return the current {@link BaseIntegrationFlowDefinition}.
+	 * @since 6.4
+	 * @deprecated since 6.5 in favor of {@link #controlBus(Consumer)}
+	 * @see GenericEndpointSpec
+	 * @see ControlBusMessageProcessor
+	 */
+	@Deprecated(since = "6.5", forRemoval = true)
+	public B controlBusOnRegistry(@Nullable Consumer<GenericEndpointSpec<ServiceActivatingHandler>> endpointConfigurer) {
+		return controlBus(endpointConfigurer);
+	}
+
+	/**
+	 * Populate the {@code Control Bus} EI Pattern specific {@link MessageHandler} implementation
+	 * at the current {@link IntegrationFlow} chain position.
+	 * @return the current {@link BaseIntegrationFlowDefinition}.
 	 */
 	public B controlBus() {
 		return controlBus(null);
@@ -528,12 +555,10 @@ public abstract class BaseIntegrationFlowDefinition<B extends BaseIntegrationFlo
 	 * at the current {@link IntegrationFlow} chain position.
 	 * @param endpointConfigurer the {@link Consumer} to accept integration endpoint options.
 	 * @return the current {@link BaseIntegrationFlowDefinition}.
-	 * @see ExpressionCommandMessageProcessor
 	 * @see GenericEndpointSpec
 	 */
 	public B controlBus(@Nullable Consumer<GenericEndpointSpec<ServiceActivatingHandler>> endpointConfigurer) {
-		return handle(new ServiceActivatingHandler(new ExpressionCommandMessageProcessor(
-				new ControlBusMethodFilter())), endpointConfigurer);
+		return handle(new ServiceActivatingHandler(new ControlBusMessageProcessor()), endpointConfigurer);
 	}
 
 	/**
@@ -701,7 +726,7 @@ public abstract class BaseIntegrationFlowDefinition<B extends BaseIntegrationFlo
 			@Nullable Consumer<GenericEndpointSpec<MessageTransformingHandler>> endpointConfigurer) {
 
 		Assert.notNull(genericTransformer, "'genericTransformer' must not be null");
-		Transformer transformer = genericTransformer instanceof Transformer ? (Transformer) genericTransformer :
+		Transformer transformer = genericTransformer instanceof Transformer castTransformer ? castTransformer :
 				(ClassUtils.isLambda(genericTransformer.getClass())
 						? new MethodInvokingTransformer(new LambdaMessageProcessor(genericTransformer, expectedType))
 						: new MethodInvokingTransformer(genericTransformer, ClassUtils.TRANSFORMER_TRANSFORM_METHOD));
@@ -873,7 +898,7 @@ public abstract class BaseIntegrationFlowDefinition<B extends BaseIntegrationFlo
 			@Nullable Consumer<FilterEndpointSpec> endpointConfigurer) {
 
 		Assert.notNull(genericSelector, "'genericSelector' must not be null");
-		MessageSelector selector = genericSelector instanceof MessageSelector ? (MessageSelector) genericSelector :
+		MessageSelector selector = genericSelector instanceof MessageSelector messageSelector ? messageSelector :
 				(ClassUtils.isLambda(genericSelector.getClass())
 						? new MethodInvokingSelector(new LambdaMessageProcessor(genericSelector, expectedType))
 						: new MethodInvokingSelector(genericSelector, ClassUtils.SELECTOR_ACCEPT_METHOD));
@@ -1109,8 +1134,8 @@ public abstract class BaseIntegrationFlowDefinition<B extends BaseIntegrationFlo
 			@Nullable Consumer<GenericEndpointSpec<H>> endpointConfigurer) {
 
 		Assert.notNull(messageHandlerSpec, "'messageHandlerSpec' must not be null");
-		if (messageHandlerSpec instanceof ComponentsRegistration) {
-			addComponents(((ComponentsRegistration) messageHandlerSpec).getComponentsToRegister());
+		if (messageHandlerSpec instanceof ComponentsRegistration componentsRegistration) {
+			addComponents(componentsRegistration.getComponentsToRegister());
 		}
 		return handle(messageHandlerSpec.getObject(), endpointConfigurer);
 	}

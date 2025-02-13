@@ -62,6 +62,7 @@ import org.springframework.util.Assert;
  * @author Mark Fisher
  * @author Artem Bilan
  * @author Gary Russell
+ * @author Ngoc Nhan
  *
  * @since 2.1
  */
@@ -113,6 +114,7 @@ public class AmqpInboundGateway extends MessagingGatewaySupport {
 
 	private AmqpInboundGateway(MessageListenerContainer listenerContainer, AmqpTemplate amqpTemplate,
 			boolean amqpTemplateExplicitlySet) {
+
 		Assert.notNull(listenerContainer, "listenerContainer must not be null");
 		Assert.notNull(amqpTemplate, "'amqpTemplate' must not be null");
 		Assert.isNull(listenerContainer.getMessageListener(),
@@ -123,12 +125,12 @@ public class AmqpInboundGateway extends MessagingGatewaySupport {
 		this.messageListenerContainer.setAutoStartup(false);
 		this.amqpTemplate = amqpTemplate;
 		this.amqpTemplateExplicitlySet = amqpTemplateExplicitlySet;
-		if (this.amqpTemplateExplicitlySet && this.amqpTemplate instanceof RabbitTemplate) {
-			this.templateMessageConverter = ((RabbitTemplate) this.amqpTemplate).getMessageConverter();
+		if (this.amqpTemplateExplicitlySet && this.amqpTemplate instanceof RabbitTemplate rabbitTemplate) {
+			this.templateMessageConverter = rabbitTemplate.getMessageConverter();
 		}
 		setErrorMessageStrategy(new AmqpMessageHeaderErrorMessageStrategy());
-		this.abstractListenerContainer = listenerContainer instanceof AbstractMessageListenerContainer
-				? (AbstractMessageListenerContainer) listenerContainer
+		this.abstractListenerContainer = listenerContainer instanceof AbstractMessageListenerContainer abstractMessageListenerContainer
+				? abstractMessageListenerContainer
 				: null;
 	}
 
@@ -193,7 +195,7 @@ public class AmqpInboundGateway extends MessagingGatewaySupport {
 	 * @since 4.3.10
 	 * @see #setRetryTemplate(RetryTemplate)
 	 */
-	public void setRecoveryCallback(RecoveryCallback<? extends Object> recoveryCallback) {
+	public void setRecoveryCallback(RecoveryCallback<?> recoveryCallback) {
 		this.recoveryCallback = recoveryCallback;
 	}
 
@@ -339,6 +341,9 @@ public class AmqpInboundGateway extends MessagingGatewaySupport {
 	}
 
 	protected class Listener implements ChannelAwareMessageListener {
+
+		protected Listener() {
+		}
 
 		@SuppressWarnings("unchecked")
 		@Override

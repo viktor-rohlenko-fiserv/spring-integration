@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,8 +51,6 @@ import org.springframework.integration.util.UUIDConverter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.support.lob.DefaultLobHandler;
-import org.springframework.jdbc.support.lob.LobHandler;
 import org.springframework.jmx.export.annotation.ManagedAttribute;
 import org.springframework.jmx.export.annotation.ManagedMetric;
 import org.springframework.jmx.export.annotation.ManagedResource;
@@ -87,6 +85,7 @@ import org.springframework.util.StringUtils;
  * @author Meherzad Lahewala
  * @author Trung Pham
  * @author Johannes Edmeier
+ * @author Ngoc Nhan
  *
  * @since 2.2
  */
@@ -142,8 +141,6 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 	private AllowListDeserializingConverter deserializer;
 
 	private SerializingConverter serializer;
-
-	private LobHandler lobHandler = new DefaultLobHandler();
 
 	private MessageRowMapper messageRowMapper;
 
@@ -225,16 +222,6 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 	public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
 		Assert.notNull(jdbcTemplate, "The provided jdbcTemplate must not be null.");
 		this.jdbcTemplate = jdbcTemplate;
-	}
-
-	/**
-	 * Override the {@link LobHandler} that is used to create and unpack large objects in SQL queries. The default is
-	 * fine for almost all platforms, but some Oracle drivers require a native implementation.
-	 * @param lobHandler a {@link LobHandler}
-	 */
-	public void setLobHandler(LobHandler lobHandler) {
-		Assert.notNull(lobHandler, "The provided LobHandler must not be null.");
-		this.lobHandler = lobHandler;
 	}
 
 	/**
@@ -396,8 +383,8 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 	 * and {@link ChannelMessageStorePreparedStatementSetter} was explicitly set using
 	 * {@link #setMessageRowMapper(MessageRowMapper)} and
 	 * {@link #setPreparedStatementSetter(ChannelMessageStorePreparedStatementSetter)}  respectively, the default
-	 * {@link MessageRowMapper} and {@link ChannelMessageStorePreparedStatementSetter} will be instantiate using the
-	 * specified {@link #deserializer} and {@link #lobHandler}.
+	 * {@link MessageRowMapper} and {@link ChannelMessageStorePreparedStatementSetter} will be instantiated using the
+	 * specified {@link #deserializer}.
 	 * Also, if the jdbcTemplate's fetchSize property ({@link JdbcTemplate#getFetchSize()})
 	 * is not 1, a warning will be logged. When using the {@link JdbcChannelMessageStore}
 	 * with Oracle, the fetchSize value of 1 is needed to ensure FIFO characteristics
@@ -409,7 +396,7 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 		Assert.notNull(this.channelMessageStoreQueryProvider, "A channelMessageStoreQueryProvider must be provided.");
 
 		if (this.messageRowMapper == null) {
-			this.messageRowMapper = new MessageRowMapper(this.deserializer, this.lobHandler);
+			this.messageRowMapper = new MessageRowMapper(this.deserializer);
 		}
 
 		if (this.jdbcTemplate.getFetchSize() != 1) {
@@ -417,8 +404,7 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 		}
 
 		if (this.preparedStatementSetter == null) {
-			this.preparedStatementSetter = new ChannelMessageStorePreparedStatementSetter(this.serializer,
-					this.lobHandler);
+			this.preparedStatementSetter = new ChannelMessageStorePreparedStatementSetter(this.serializer);
 		}
 		this.jdbcTemplate.afterPropertiesSet();
 	}
@@ -431,7 +417,7 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 	public void setCheckDatabaseOnStart(boolean checkDatabaseOnStart) {
 		this.checkDatabaseOnStart = checkDatabaseOnStart;
 		if (!checkDatabaseOnStart) {
-			LOGGER.info("The 'DefaultLockRepository' won't be started automatically " +
+			LOGGER.info("The 'JdbcChannelMessageStore' won't be started automatically " +
 					"and required table is not going be checked.");
 		}
 	}
@@ -613,7 +599,7 @@ public class JdbcChannelMessageStore implements PriorityCapableChannelMessageSto
 
 		Assert.state(messages.size() < 2,
 				() -> "The query must return zero or 1 row; got " + messages.size() + " rows");
-		if (messages.size() > 0) {
+		if (!messages.isEmpty()) {
 
 			final Message<?> message = messages.get(0);
 			UUID id = message.getHeaders().getId();

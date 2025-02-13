@@ -64,7 +64,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.log.LogAccessor;
 import org.springframework.core.serializer.support.SerializingConverter;
 import org.springframework.core.type.AnnotatedTypeMetadata;
-import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.IndexAccessor;
 import org.springframework.expression.spel.support.ReflectivePropertyAccessor;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.integration.annotation.Aggregator;
@@ -89,10 +89,10 @@ import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.NullChannel;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.channel.interceptor.WireTap;
+import org.springframework.integration.config.ControlBusFactoryBean;
 import org.springframework.integration.config.EnableIntegration;
 import org.springframework.integration.config.EnableMessageHistory;
 import org.springframework.integration.config.EnablePublisher;
-import org.springframework.integration.config.ExpressionControlBusFactoryBean;
 import org.springframework.integration.config.GlobalChannelInterceptor;
 import org.springframework.integration.config.IntegrationConverter;
 import org.springframework.integration.config.SpelFunctionFactoryBean;
@@ -112,6 +112,7 @@ import org.springframework.integration.handler.ServiceActivatingHandler;
 import org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice;
 import org.springframework.integration.history.MessageHistory;
 import org.springframework.integration.history.MessageHistoryConfigurer;
+import org.springframework.integration.json.JsonIndexAccessor;
 import org.springframework.integration.json.JsonPropertyAccessor;
 import org.springframework.integration.scheduling.PollerMetadata;
 import org.springframework.integration.support.MessageBuilder;
@@ -454,15 +455,15 @@ public class EnableIntegrationTests {
 		assertThat(message.getHeaders().get("foo")).isEqualTo("FOO");
 
 		MessagingTemplate messagingTemplate = new MessagingTemplate(this.controlBusChannel);
-		assertThat(messagingTemplate.convertSendAndReceive("@pausable.isRunning()", Boolean.class)).isEqualTo(false);
-		this.controlBusChannel.send(new GenericMessage<>("@pausable.start()"));
-		assertThat(messagingTemplate.convertSendAndReceive("@pausable.isRunning()", Boolean.class)).isEqualTo(true);
-		this.controlBusChannel.send(new GenericMessage<>("@pausable.stop()"));
-		assertThat(messagingTemplate.convertSendAndReceive("@pausable.isRunning()", Boolean.class)).isEqualTo(false);
-		this.controlBusChannel.send(new GenericMessage<>("@pausable.pause()"));
+		assertThat(messagingTemplate.convertSendAndReceive("pausable.isRunning", Boolean.class)).isEqualTo(false);
+		this.controlBusChannel.send(new GenericMessage<>("pausable.start"));
+		assertThat(messagingTemplate.convertSendAndReceive("pausable.isRunning", Boolean.class)).isEqualTo(true);
+		this.controlBusChannel.send(new GenericMessage<>("pausable.stop"));
+		assertThat(messagingTemplate.convertSendAndReceive("pausable.isRunning", Boolean.class)).isEqualTo(false);
+		this.controlBusChannel.send(new GenericMessage<>("pausable.pause"));
 		Object pausable = this.context.getBean("pausable");
 		assertThat(TestUtils.getPropertyValue(pausable, "paused", Boolean.class)).isTrue();
-		this.controlBusChannel.send(new GenericMessage<>("@pausable.resume()"));
+		this.controlBusChannel.send(new GenericMessage<>("pausable.resume"));
 		assertThat(TestUtils.getPropertyValue(pausable, "paused", Boolean.class)).isFalse();
 
 		Map<String, ServiceActivatingHandler> beansOfType =
@@ -786,15 +787,17 @@ public class EnableIntegrationTests {
 
 	@Test
 	public void testIntegrationEvaluationContextCustomization() {
-		EvaluationContext evaluationContext = this.context.getBean(StandardEvaluationContext.class);
-		List<?> propertyAccessors = TestUtils.getPropertyValue(evaluationContext, "propertyAccessors", List.class);
+		StandardEvaluationContext evaluationContext = this.context.getBean(StandardEvaluationContext.class);
+		List<?> propertyAccessors = evaluationContext.getPropertyAccessors();
 		assertThat(propertyAccessors.size()).isEqualTo(4);
 		assertThat(propertyAccessors.get(0)).isInstanceOf(JsonPropertyAccessor.class);
 		assertThat(propertyAccessors.get(1)).isInstanceOf(EnvironmentAccessor.class);
 		assertThat(propertyAccessors.get(2)).isInstanceOf(MapAccessor.class);
 		assertThat(propertyAccessors.get(3)).isInstanceOf(ReflectivePropertyAccessor.class);
-		Map<?, ?> variables = TestUtils.getPropertyValue(evaluationContext, "variables", Map.class);
-		Object testSpelFunction = variables.get("testSpelFunction");
+		List<IndexAccessor> indexAccessors = evaluationContext.getIndexAccessors();
+		assertThat(indexAccessors.size()).isEqualTo(1);
+		assertThat(indexAccessors.get(0)).isInstanceOf(JsonIndexAccessor.class);
+		Object testSpelFunction = evaluationContext.lookupVariable("testSpelFunction");
 		assertThat(testSpelFunction).isEqualTo(ClassUtils.getStaticMethod(TestSpelFunction.class, "bar",
 				Object.class));
 	}
@@ -1113,8 +1116,8 @@ public class EnableIntegrationTests {
 		@ServiceActivator(inputChannel = "controlBusChannel")
 		@EndpointId("controlBusEndpoint")
 		@Role("bar")
-		public ExpressionControlBusFactoryBean controlBus() {
-			return new ExpressionControlBusFactoryBean();
+		public ControlBusFactoryBean controlBus() {
+			return new ControlBusFactoryBean();
 		}
 
 		@Autowired
@@ -1244,7 +1247,9 @@ public class EnableIntegrationTests {
 
 		@Bean
 		public SpelPropertyAccessorRegistrar spelPropertyAccessorRegistrar() {
-			return new SpelPropertyAccessorRegistrar(new JsonPropertyAccessor(), new EnvironmentAccessor());
+			return new SpelPropertyAccessorRegistrar(new JsonPropertyAccessor())
+					.add(new EnvironmentAccessor())
+					.add(new JsonIndexAccessor());
 		}
 
 		@Bean

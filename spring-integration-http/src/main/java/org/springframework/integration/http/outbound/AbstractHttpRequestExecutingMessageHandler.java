@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 the original author or authors.
+ * Copyright 2017-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.xml.transform.Source;
 
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.context.ApplicationContext;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -74,6 +73,7 @@ import org.springframework.web.util.DefaultUriBuilderFactory;
  * @author Shiliang Li
  * @author Florian Schöffl
  * @author Christian Tzolov
+ * @author Ngoc Nhan
  *
  * @since 5.0
  */
@@ -100,6 +100,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 
 	private boolean expectReply = true;
 
+	@Nullable
 	private Expression expectedResponseTypeExpression;
 
 	private boolean extractPayload = true;
@@ -114,6 +115,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 
 	private HeaderMapper<HttpHeaders> headerMapper = DefaultHttpHeaderMapper.outboundMapper();
 
+	@Nullable
 	private Expression uriVariablesExpression;
 
 	public AbstractHttpRequestExecutingMessageHandler(Expression uriExpression) {
@@ -196,7 +198,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 	 * Specify the expected response type for the REST request.
 	 * Otherwise, it is null and an empty {@link ResponseEntity} is returned from HTTP client.
 	 * To take advantage of the HttpMessageConverters
-	 * registered on this adapter, provide a different type).
+	 * registered on this adapter, provide a different type.
 	 * @param expectedResponseType The expected type.
 	 * Also see {@link #setExpectedResponseTypeExpression(Expression)}
 	 */
@@ -322,7 +324,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 
 	@Nullable
 	protected abstract Object exchange(Object uri, HttpMethod httpMethod, HttpEntity<?> httpRequest,
-			Object expectedResponseType, Message<?> requestMessage, Map<String, ?> uriVariables);
+			@Nullable Object expectedResponseType, Message<?> requestMessage, @Nullable Map<String, ?> uriVariables);
 
 	protected Object getReply(ResponseEntity<?> httpResponse) {
 		HttpHeaders httpHeaders = httpResponse.getHeaders();
@@ -377,6 +379,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 		}
 		HttpHeaders httpHeaders = mapHeaders(message);
 		if (!shouldIncludeRequestBody(httpMethod)) {
+			httpHeaders.remove(HttpHeaders.CONTENT_LENGTH);
 			return new HttpEntity<>(httpHeaders);
 		}
 		// otherwise, we are creating a request with a body and need to deal with the content-type header as well
@@ -402,7 +405,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 	private HttpEntity<?> createHttpEntityFromMessage(Message<?> message, HttpMethod httpMethod) {
 		HttpHeaders httpHeaders = mapHeaders(message);
 		if (shouldIncludeRequestBody(httpMethod)) {
-			return new HttpEntity<Object>(message, httpHeaders);
+			return new HttpEntity<>(message, httpHeaders);
 		}
 		return new HttpEntity<>(httpHeaders);
 	}
@@ -445,11 +448,11 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 		for (Entry<?, ?> entry : simpleMap.entrySet()) {
 			Object key = entry.getKey();
 			Object value = entry.getValue();
-			if (value instanceof Object[]) {
-				value = Arrays.asList((Object[]) value);
+			if (value instanceof Object[] objects) {
+				value = Arrays.asList(objects);
 			}
-			if (value instanceof Collection) {
-				multipartValueMap.put(key, new ArrayList<>((Collection<?>) value));
+			if (value instanceof Collection<?> collection) {
+				multipartValueMap.put(key, new ArrayList<>(collection));
 			}
 			else {
 				multipartValueMap.add(key, value);
@@ -500,8 +503,8 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 		Assert.state((httpMethod instanceof String || httpMethod instanceof HttpMethod), () ->
 				"'httpMethodExpression' evaluation must result in an 'HttpMethod' enum or its String representation, " +
 						"not: " + (httpMethod == null ? "null" : httpMethod.getClass()));
-		if (httpMethod instanceof HttpMethod) {
-			return (HttpMethod) httpMethod;
+		if (httpMethod instanceof HttpMethod castHttpMethod) {
+			return castHttpMethod;
 		}
 		else {
 			try {
@@ -514,6 +517,7 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 		}
 	}
 
+	@Nullable
 	private Object determineExpectedResponseType(Message<?> requestMessage) {
 		return evaluateTypeFromExpression(requestMessage, this.expectedResponseTypeExpression, "expectedResponseType");
 	}
@@ -534,11 +538,9 @@ public abstract class AbstractHttpRequestExecutingMessageHandler extends Abstrac
 					() -> "The '" + property + "' can be an instance of 'Class<?>', 'String' " +
 							"or 'ParameterizedTypeReference<?>'; " +
 							"evaluation resulted in a " + typeClass + ".");
-			if (type instanceof String && StringUtils.hasText((String) type)) {
+			if (type instanceof String string && StringUtils.hasText(string)) {
 				try {
-					ApplicationContext applicationContext = getApplicationContext();
-					type = ClassUtils.forName((String) type,
-							applicationContext == null ? null : applicationContext.getClassLoader());
+					type = ClassUtils.forName(string, getApplicationContext().getClassLoader());
 				}
 				catch (ClassNotFoundException e) {
 					throw new IllegalStateException("Cannot load class for name: " + type, e);

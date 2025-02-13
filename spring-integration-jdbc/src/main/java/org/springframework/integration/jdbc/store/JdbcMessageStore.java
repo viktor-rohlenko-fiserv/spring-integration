@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package org.springframework.integration.jdbc.store;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collection;
@@ -38,6 +36,7 @@ import org.springframework.core.serializer.Serializer;
 import org.springframework.core.serializer.support.SerializingConverter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import org.springframework.integration.jdbc.store.channel.MessageRowMapper;
 import org.springframework.integration.store.AbstractMessageGroupStore;
 import org.springframework.integration.store.MessageGroup;
 import org.springframework.integration.store.MessageGroupMetadata;
@@ -49,10 +48,7 @@ import org.springframework.integration.util.FunctionIterator;
 import org.springframework.integration.util.UUIDConverter;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.SingleColumnRowMapper;
-import org.springframework.jdbc.support.lob.DefaultLobHandler;
-import org.springframework.jdbc.support.lob.LobHandler;
 import org.springframework.jmx.export.annotation.ManagedAttribute;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
@@ -82,6 +78,8 @@ import org.springframework.util.StringUtils;
  * @author Will Schipp
  * @author Gary Russell
  * @author Artem Bilan
+ * @author Ngoc Nhan
+ * @author Youbin Wu
  *
  * @since 2.0
  */
@@ -253,8 +251,6 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 		}
 	}
 
-	private final MessageMapper mapper = new MessageMapper();
-
 	private final JdbcOperations jdbcTemplate;
 
 	private final Map<Query, String> queryCache = new ConcurrentHashMap<>();
@@ -270,9 +266,9 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 
 	private boolean deserializerExplicitlySet;
 
-	private SerializingConverter serializer;
+	private MessageRowMapper mapper = new MessageRowMapper(this.deserializer);
 
-	private LobHandler lobHandler = new DefaultLobHandler();
+	private SerializingConverter serializer;
 
 	private boolean checkDatabaseOnStart = true;
 
@@ -322,15 +318,6 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	/**
-	 * Override the {@link LobHandler} that is used to create and unpack large objects in SQL queries. The default is
-	 * fine for almost all platforms, but some Oracle drivers require a native implementation.
-	 * @param lobHandler a {@link LobHandler}
-	 */
-	public void setLobHandler(LobHandler lobHandler) {
-		this.lobHandler = lobHandler;
-	}
-
-	/**
 	 * A converter for serializing messages to byte arrays for storage.
 	 * @param serializer the serializer to set
 	 */
@@ -347,6 +334,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	public void setDeserializer(Deserializer<? extends Message<?>> deserializer) {
 		this.deserializer = new AllowListDeserializingConverter((Deserializer) deserializer);
 		this.deserializerExplicitlySet = true;
+		this.mapper = new MessageRowMapper(this.deserializer);
 	}
 
 	/**
@@ -368,7 +356,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	public void setCheckDatabaseOnStart(boolean checkDatabaseOnStart) {
 		this.checkDatabaseOnStart = checkDatabaseOnStart;
 		if (!checkDatabaseOnStart) {
-			logger.info("The 'DefaultLockRepository' won't be started automatically " +
+			logger.info("The 'JdbcMessageStore' won't be started automatically " +
 					"and required table is not going be checked.");
 		}
 	}
@@ -459,8 +447,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 				ps.setString(1, messageId); // NOSONAR - magic number
 				ps.setString(2, this.region); // NOSONAR - magic number
 				ps.setTimestamp(3, new Timestamp(System.currentTimeMillis())); // NOSONAR - magic number
-
-				this.lobHandler.getLobCreator().setBlobAsBytes(ps, 4, messageBytes); // NOSONAR - magic number
+				ps.setBytes(4, messageBytes); // NOSONAR - magic number
 			});
 		}
 		catch (DataIntegrityViolationException ex) {
@@ -474,7 +461,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void addMessagesToGroup(Object groupId, Message<?>... messages) {
+	protected void doAddMessagesToGroup(Object groupId, Message<?>... messages) {
 		String groupKey = getKey(groupId);
 		MessageGroupMetadata groupMetadata = getGroupMetadata(groupKey);
 
@@ -578,7 +565,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void removeMessagesFromGroup(Object groupId, Collection<Message<?>> messages) {
+	protected void doRemoveMessagesFromGroup(Object groupId, Collection<Message<?>> messages) {
 		Assert.notNull(groupId, "'groupId' must not be null");
 		Assert.notNull(messages, "'messages' must not be null");
 
@@ -623,7 +610,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public boolean removeMessageFromGroupById(Object groupId, UUID messageId) {
+	protected boolean doRemoveMessageFromGroupById(Object groupId, UUID messageId) {
 		String groupKey = getKey(groupId);
 		String messageKey = getKey(messageId);
 		int messageToGroupRemoved =
@@ -636,7 +623,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void removeMessageGroup(Object groupId) {
+	protected void doRemoveMessageGroup(Object groupId) {
 		String groupKey = getKey(groupId);
 
 		this.jdbcTemplate.update(getQuery(Query.DELETE_MESSAGES_FROM_GROUP),
@@ -655,7 +642,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void completeGroup(Object groupId) {
+	protected void doCompleteGroup(Object groupId) {
 		final String groupKey = getKey(groupId);
 
 		if (logger.isDebugEnabled()) {
@@ -666,7 +653,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void setGroupCondition(Object groupId, String condition) {
+	protected void doSetGroupCondition(Object groupId, String condition) {
 		Assert.notNull(groupId, "'groupId' must not be null");
 		String groupKey = getKey(groupId);
 		Timestamp updatedDate = new Timestamp(System.currentTimeMillis());
@@ -677,7 +664,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public void setLastReleasedSequenceNumberForGroup(Object groupId, int sequenceNumber) {
+	protected void doSetLastReleasedSequenceNumberForGroup(Object groupId, int sequenceNumber) {
 		Assert.notNull(groupId, "'groupId' must not be null");
 		String groupKey = getKey(groupId);
 
@@ -689,7 +676,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 	}
 
 	@Override
-	public Message<?> pollMessageFromGroup(Object groupId) {
+	protected Message<?> doPollMessageFromGroup(Object groupId) {
 		String key = getKey(groupId);
 
 		Message<?> polledMessage = doPollForMessage(key);
@@ -755,7 +742,7 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 				groupIdKey, this.region, groupIdKey, this.region);
 		Assert.state(messages.size() < 2,
 				() -> "The query must return zero or 1 row; got " + messages.size() + " rows");
-		if (messages.size() > 0) {
+		if (!messages.isEmpty()) {
 			return messages.get(0);
 		}
 		return null;
@@ -778,25 +765,6 @@ public class JdbcMessageStore extends AbstractMessageGroupStore
 
 	private String getKey(Object input) {
 		return input == null ? null : UUIDConverter.getUUID(input).toString();
-	}
-
-	/**
-	 * Convenience class to be used to unpack a message from a result set row. Uses column named in the result set to
-	 * extract the required data, so that select clause ordering is unimportant.
-	 */
-	private final class MessageMapper implements RowMapper<Message<?>> {
-
-		@Override
-		public Message<?> mapRow(ResultSet rs, int rowNum) throws SQLException {
-			byte[] messageBytes = JdbcMessageStore.this.lobHandler.getBlobAsBytes(rs, "MESSAGE_BYTES");
-			if (messageBytes == null) {
-				return null;
-			}
-			else {
-				return (Message<?>) JdbcMessageStore.this.deserializer.convert(messageBytes);
-			}
-		}
-
 	}
 
 }

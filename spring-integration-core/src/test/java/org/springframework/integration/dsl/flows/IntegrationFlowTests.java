@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,6 +81,7 @@ import org.springframework.integration.store.MessageStore;
 import org.springframework.integration.store.SimpleMessageStore;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.integration.support.MutableMessageBuilder;
+import org.springframework.integration.test.util.TestUtils;
 import org.springframework.integration.transformer.PayloadSerializingTransformer;
 import org.springframework.integration.util.NoBeansOverrideAnnotationConfigContextLoader;
 import org.springframework.messaging.Message;
@@ -94,6 +95,7 @@ import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
@@ -187,10 +189,15 @@ public class IntegrationFlowTests {
 	@Autowired
 	AbstractEndpoint stringSupplierEndpoint;
 
+	@Autowired
+	TaskScheduler customScheduler;
+
 	@Test
 	public void testWithSupplierMessageSourceImpliedPoller() {
 		assertThat(this.stringSupplierEndpoint.isAutoStartup()).isFalse();
 		assertThat(this.stringSupplierEndpoint.isRunning()).isFalse();
+		assertThat(TestUtils.getPropertyValue(this.stringSupplierEndpoint, "taskScheduler"))
+				.isSameAs(this.customScheduler);
 		this.stringSupplierEndpoint.start();
 		assertThat(this.suppliedChannel.receive(10000).getPayload()).isEqualTo("FOO");
 	}
@@ -214,7 +221,7 @@ public class IntegrationFlowTests {
 				.withCauseInstanceOf(MessageDispatchingException.class)
 				.withMessageContaining("Dispatcher has no subscribers");
 
-		this.controlBus.send("@payloadSerializingTransformer.start()");
+		this.controlBus.send("payloadSerializingTransformer.start");
 
 		final AtomicBoolean used = new AtomicBoolean();
 
@@ -253,7 +260,7 @@ public class IntegrationFlowTests {
 				.withCauseInstanceOf(MessageDispatchingException.class)
 				.withMessageContaining("Dispatcher has no subscribers");
 
-		this.controlBus.send("@bridge.start()");
+		this.controlBus.send("bridge.start");
 		this.bridgeFlow2Input.send(message);
 		reply = this.bridgeFlow2Output.receive(10000);
 		assertThat(reply).isNotNull();
@@ -569,8 +576,14 @@ public class IntegrationFlowTests {
 		}
 
 		@Bean
-		public IntegrationFlow supplierFlow() {
-			return IntegrationFlow.fromSupplier(stringSupplier(), c -> c.id("stringSupplierEndpoint"))
+		public TaskScheduler customScheduler() {
+			return new SimpleAsyncTaskScheduler();
+		}
+
+		@Bean
+		public IntegrationFlow supplierFlow(TaskScheduler customScheduler) {
+			return IntegrationFlow.fromSupplier(stringSupplier(),
+							c -> c.id("stringSupplierEndpoint").taskScheduler(customScheduler))
 					.transform(toUpperCaseFunction())
 					.channel("suppliedChannel")
 					.get();

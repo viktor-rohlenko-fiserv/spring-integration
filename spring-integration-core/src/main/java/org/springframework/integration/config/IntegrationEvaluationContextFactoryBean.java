@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2019 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,17 @@ import java.lang.reflect.Method;
 import java.util.Map.Entry;
 
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.expression.BeanFactoryResolver;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.BeanResolver;
+import org.springframework.expression.IndexAccessor;
 import org.springframework.expression.PropertyAccessor;
 import org.springframework.expression.TypeLocator;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.StandardTypeLocator;
 import org.springframework.integration.context.IntegrationContextUtils;
+import org.springframework.lang.Nullable;
 
 /**
  * <p>
@@ -65,7 +69,8 @@ import org.springframework.integration.context.IntegrationContextUtils;
 public class IntegrationEvaluationContextFactoryBean extends AbstractEvaluationContextFactoryBean
 		implements FactoryBean<StandardEvaluationContext> {
 
-	private volatile TypeLocator typeLocator;
+	@Nullable
+	private TypeLocator typeLocator;
 
 	private BeanResolver beanResolver;
 
@@ -80,8 +85,12 @@ public class IntegrationEvaluationContextFactoryBean extends AbstractEvaluationC
 
 	@Override
 	public void afterPropertiesSet() {
-		if (getApplicationContext() != null) {
-			this.beanResolver = new BeanFactoryResolver(getApplicationContext());
+		ApplicationContext applicationContext = getApplicationContext();
+		if (applicationContext != null) {
+			this.beanResolver = new BeanFactoryResolver(applicationContext);
+			if (this.typeLocator == null) {
+				this.typeLocator = new StandardTypeLocator(applicationContext.getClassLoader());
+			}
 		}
 		initialize(IntegrationContextUtils.INTEGRATION_EVALUATION_CONTEXT_BEAN_NAME);
 	}
@@ -101,6 +110,10 @@ public class IntegrationEvaluationContextFactoryBean extends AbstractEvaluationC
 		}
 
 		evaluationContext.addPropertyAccessor(new MapAccessor());
+
+		for (IndexAccessor indexAccessor : getIndexAccessors().values()) {
+			evaluationContext.addIndexAccessor(indexAccessor);
+		}
 
 		for (Entry<String, Method> functionEntry : getFunctions().entrySet()) {
 			evaluationContext.registerFunction(functionEntry.getKey(), functionEntry.getValue());

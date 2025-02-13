@@ -16,6 +16,7 @@
 
 package org.springframework.integration.redis.util;
 
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -50,10 +51,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.integration.redis.RedisContainerTest;
 import org.springframework.integration.redis.util.RedisLockRegistry.RedisLockType;
 import org.springframework.integration.test.util.TestUtils;
+import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -64,6 +67,8 @@ import static org.mockito.Mockito.mock;
  * @author Unseok Kim
  * @author Artem Vozhdayenko
  * @author Anton Gabov
+ * @author Eddie Cho
+ * @author Youbin Wu
  *
  * @since 4.0
  *
@@ -112,6 +117,19 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		}
 		registry.expireUnusedOlderThan(-1000);
 		assertThat(getRedisLockRegistryLocks(registry)).isEmpty();
+		registry.destroy();
+	}
+
+	@ParameterizedTest
+	@EnumSource(RedisLockType.class)
+	void testUnlockAfterLockStatusHasBeenExpired(RedisLockType testRedisLockType) throws InterruptedException {
+		RedisLockRegistry registry = new RedisLockRegistry(redisConnectionFactory, this.registryKey, 100);
+		registry.setRedisLockType(testRedisLockType);
+		Lock lock = registry.obtain("foo");
+		lock.lock();
+		Thread.sleep(200);
+
+		assertThatThrownBy(lock::unlock).isInstanceOf(ConcurrentModificationException.class);
 		registry.destroy();
 	}
 
@@ -228,7 +246,8 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		lock1.lockInterruptibly();
 		final AtomicBoolean locked = new AtomicBoolean();
 		final CountDownLatch latch = new CountDownLatch(1);
-		Future<Object> result = Executors.newSingleThreadExecutor().submit(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		Future<Object> result = executorService.submit(() -> {
 			Lock lock2 = registry.obtain("foo");
 			locked.set(lock2.tryLock(200, TimeUnit.MILLISECONDS));
 			latch.countDown();
@@ -249,6 +268,7 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		registry.expireUnusedOlderThan(-1000);
 		assertThat(getRedisLockRegistryLocks(registry)).isEmpty();
 		registry.destroy();
+		executorService.shutdown();
 	}
 
 	@ParameterizedTest
@@ -263,7 +283,8 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		CountDownLatch latch3 = new CountDownLatch(1);
 		lock1.lockInterruptibly();
 		assertThat(getRedisLockRegistryLocks(registry)).hasSize(1);
-		Executors.newSingleThreadExecutor().execute(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		executorService.execute(() -> {
 			Lock lock2 = registry.obtain("foo");
 			try {
 				latch1.countDown();
@@ -289,6 +310,7 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		registry.expireUnusedOlderThan(-1000);
 		assertThat(getRedisLockRegistryLocks(registry)).isEmpty();
 		registry.destroy();
+		executorService.shutdown();
 	}
 
 	@ParameterizedTest
@@ -305,7 +327,8 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		CountDownLatch latch3 = new CountDownLatch(1);
 		lock1.lockInterruptibly();
 		assertThat(getRedisLockRegistryLocks(registry1)).hasSize(1);
-		Executors.newSingleThreadExecutor().execute(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		executorService.execute(() -> {
 			Lock lock2 = registry2.obtain("foo");
 			try {
 				latch1.countDown();
@@ -340,6 +363,7 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		assertThat(getRedisLockRegistryLocks(registry2)).isEmpty();
 		registry1.destroy();
 		registry2.destroy();
+		executorService.shutdown();
 	}
 
 	@ParameterizedTest
@@ -351,7 +375,8 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		lock.lockInterruptibly();
 		AtomicBoolean locked = new AtomicBoolean();
 		CountDownLatch latch = new CountDownLatch(1);
-		Future<Object> result = Executors.newSingleThreadExecutor().submit(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		Future<Object> result = executorService.submit(() -> {
 			try {
 				lock.unlock();
 			}
@@ -370,6 +395,7 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		registry.expireUnusedOlderThan(-1000);
 		assertThat(getRedisLockRegistryLocks(registry)).isEmpty();
 		registry.destroy();
+		executorService.shutdown();
 	}
 
 	@ParameterizedTest
@@ -398,9 +424,23 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		Lock lock1 = registry.obtain("foo");
 		assertThat(lock1.tryLock()).isTrue();
 		waitForExpire("foo");
-		assertThatIllegalStateException()
-				.isThrownBy(lock1::unlock)
-				.withMessageContaining("Lock was released in the store due to expiration.");
+		assertThatThrownBy(lock1::unlock)
+				.isInstanceOf(ConcurrentModificationException.class)
+				.hasMessageContaining("Lock was released in the store due to expiration.");
+		registry.destroy();
+	}
+
+	@ParameterizedTest
+	@EnumSource(RedisLockType.class)
+	void testRenewalOnExpire(RedisLockType redisLockType) throws Exception {
+		long expireAfter = 300L;
+		RedisLockRegistry registry = new RedisLockRegistry(redisConnectionFactory, this.registryKey, expireAfter);
+		registry.setRenewalTaskScheduler(new SimpleAsyncTaskScheduler());
+		registry.setRedisLockType(redisLockType);
+		Lock lock1 = registry.obtain("foo");
+		assertThat(lock1.tryLock()).isTrue();
+		Thread.sleep(expireAfter * 2);
+		lock1.unlock();
 		registry.destroy();
 	}
 
@@ -481,7 +521,8 @@ class RedisLockRegistryTests implements RedisContainerTest {
 
 		Long expire = getExpire(registry, "foo");
 
-		Future<Object> result = Executors.newSingleThreadExecutor().submit(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		Future<Object> result = executorService.submit(() -> {
 			Lock lock2 = registry.obtain("foo");
 			assertThat(lock2.tryLock()).isFalse();
 			return null;
@@ -490,6 +531,7 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		assertThat(getExpire(registry, "foo")).isEqualTo(expire);
 		lock.unlock();
 		registry.destroy();
+		executorService.shutdown();
 	}
 
 	@ParameterizedTest
@@ -873,6 +915,33 @@ class RedisLockRegistryTests implements RedisContainerTest {
 		}
 
 		registry.destroy();
+	}
+
+	@ParameterizedTest
+	@EnumSource(RedisLockType.class)
+	void testLockRenew(RedisLockType redisLockType) {
+		final RedisLockRegistry registry = new RedisLockRegistry(redisConnectionFactory, this.registryKey);
+		registry.setRedisLockType(redisLockType);
+		final Lock lock = registry.obtain("foo");
+
+		assertThat(lock.tryLock()).isTrue();
+		try {
+			registry.renewLock("foo");
+		}
+		finally {
+			lock.unlock();
+		}
+	}
+
+	@ParameterizedTest
+	@EnumSource(RedisLockType.class)
+	void testLockRenewLockNotOwned(RedisLockType redisLockType) {
+		final RedisLockRegistry registry = new RedisLockRegistry(redisConnectionFactory, this.registryKey);
+		registry.setRedisLockType(redisLockType);
+		registry.obtain("foo");
+
+		assertThatExceptionOfType(IllegalStateException.class)
+				.isThrownBy(() -> registry.renewLock("foo"));
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 the original author or authors.
+ * Copyright 2018-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.context.expression.MapAccessor;
+import org.springframework.expression.IndexAccessor;
 import org.springframework.expression.PropertyAccessor;
 import org.springframework.expression.spel.support.DataBindingPropertyAccessor;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -80,8 +81,10 @@ public class IntegrationSimpleEvaluationContextFactoryBean extends AbstractEvalu
 		accessorArray[accessors.size() + 1] = DataBindingPropertyAccessor.forReadOnlyAccess();
 		SimpleEvaluationContext evaluationContext =
 				SimpleEvaluationContext.forPropertyAccessors(accessorArray)
+						.withIndexAccessors(getIndexAccessors().values().toArray(new IndexAccessor[0]))
 						.withTypeConverter(getTypeConverter())
 						.withInstanceMethods()
+						.withAssignmentDisabled()
 						.build();
 		for (Entry<String, Method> functionEntry : getFunctions().entrySet()) {
 			evaluationContext.setVariable(functionEntry.getKey(), functionEntry.getValue());

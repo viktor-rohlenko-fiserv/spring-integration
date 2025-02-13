@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-import io.micrometer.context.ContextSnapshotFactory;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import reactor.core.Disposable;
@@ -29,19 +28,16 @@ import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
-import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
 import org.springframework.core.log.LogMessage;
 import org.springframework.integration.IntegrationMessageHeaderAccessor;
 import org.springframework.integration.StaticMessageHeaderAccessor;
 import org.springframework.integration.support.MutableMessageBuilder;
+import org.springframework.integration.util.IntegrationReactiveUtils;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
 
 /**
  * The {@link AbstractMessageChannel} implementation for the
@@ -56,14 +52,7 @@ import org.springframework.util.ClassUtils;
 public class FluxMessageChannel extends AbstractMessageChannel
 		implements Publisher<Message<?>>, ReactiveStreamsSubscribableChannel {
 
-	private static final boolean isContextPropagationPresent = ClassUtils.isPresent(
-			"io.micrometer.context.ContextSnapshot", FluxMessageChannel.class.getClassLoader());
-
-	private final Scheduler scheduler = Schedulers.boundedElastic();
-
 	private final Sinks.Many<Message<?>> sink = Sinks.many().multicast().onBackpressureBuffer(1, false);
-
-	private final Sinks.Many<Boolean> subscribedSignal = Sinks.many().replay().limit(1);
 
 	private final Disposable.Composite upstreamSubscriptions = Disposables.composite();
 
@@ -91,13 +80,11 @@ public class FluxMessageChannel extends AbstractMessageChannel
 
 	private boolean tryEmitMessage(Message<?> message) {
 		Message<?> messageToEmit = message;
-		if (isContextPropagationPresent) {
-			ContextView contextView = ContextSnapshotHelper.captureContext();
-			if (!contextView.isEmpty()) {
-				messageToEmit = MutableMessageBuilder.fromMessage(message)
-						.setHeader(IntegrationMessageHeaderAccessor.REACTOR_CONTEXT, contextView)
-						.build();
-			}
+		ContextView contextView = IntegrationReactiveUtils.captureReactorContext();
+		if (!contextView.isEmpty()) {
+			messageToEmit = MutableMessageBuilder.fromMessage(message)
+					.setHeader(IntegrationMessageHeaderAccessor.REACTOR_CONTEXT, contextView)
+					.build();
 		}
 		return switch (this.sink.tryEmitNext(messageToEmit)) {
 			case OK -> true;
@@ -113,18 +100,9 @@ public class FluxMessageChannel extends AbstractMessageChannel
 	@Override
 	public void subscribe(Subscriber<? super Message<?>> subscriber) {
 		this.sink.asFlux()
-				.doFinally((s) -> this.subscribedSignal.tryEmitNext(this.sink.currentSubscriberCount() > 0))
-				.share()
+				.publish(1)
+				.refCount()
 				.subscribe(subscriber);
-
-		Mono<Boolean> subscribersBarrier =
-				Mono.fromCallable(() -> this.sink.currentSubscriberCount() > 0)
-						.filter(Boolean::booleanValue)
-						.doOnNext(this.subscribedSignal::tryEmitNext)
-						.repeatWhenEmpty((repeat) ->
-								this.active ? repeat.delayElements(Duration.ofMillis(100)) : repeat); // NOSONAR
-
-		addPublisherToSubscribe(Flux.from(subscribersBarrier));
 	}
 
 	private void addPublisherToSubscribe(Flux<?> publisher) {
@@ -154,8 +132,11 @@ public class FluxMessageChannel extends AbstractMessageChannel
 	public void subscribeTo(Publisher<? extends Message<?>> publisher) {
 		Flux<Object> upstreamPublisher =
 				Flux.from(publisher)
-						.delaySubscription(this.subscribedSignal.asFlux().filter(Boolean::booleanValue).next())
-						.publishOn(this.scheduler)
+						.delaySubscription(
+								Mono.fromCallable(this.sink::currentSubscriberCount)
+										.filter((value) -> value > 0)
+										.repeatWhenEmpty((repeat) ->
+												this.active ? repeat.delayElements(Duration.ofMillis(100)) : repeat))
 						.flatMap((message) ->
 								Mono.just(message)
 										.handle((messageToHandle, syncSink) -> sendReactiveMessage(messageToHandle))
@@ -190,20 +171,8 @@ public class FluxMessageChannel extends AbstractMessageChannel
 	public void destroy() {
 		this.active = false;
 		this.upstreamSubscriptions.dispose();
-		this.subscribedSignal.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
 		this.sink.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
-		this.scheduler.dispose();
 		super.destroy();
-	}
-
-	private static final class ContextSnapshotHelper {
-
-		private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY = ContextSnapshotFactory.builder().build();
-
-		static ContextView captureContext() {
-			return CONTEXT_SNAPSHOT_FACTORY.captureAll().updateContext(Context.empty());
-		}
-
 	}
 
 }

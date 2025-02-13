@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 the original author or authors.
+ * Copyright 2022-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -268,7 +268,24 @@ class GroovyIntegrationFlowDefinition {
 	 * Populate the {@code Control Bus} EI Pattern specific {@link MessageHandler} implementation
 	 * at the current {@link IntegrationFlow} chain position.
 	 * @param endpointConfigurer the {@link Consumer} to accept integration endpoint options.
-	 * @see org.springframework.integration.handler.ExpressionCommandMessageProcessor* @see GenericEndpointSpec
+	 * @since 6.4
+	 * @deprecated in favor of {@link #controlBus}
+	 */
+	@Deprecated(since = '6.5', forRemoval = true)
+	@SuppressWarnings('removal')
+	GroovyIntegrationFlowDefinition controlBusOnRegistry(
+			@DelegatesTo(value = GenericEndpointSpec<ServiceActivatingHandler>, strategy = Closure.DELEGATE_FIRST)
+			@ClosureParams(value = SimpleType.class, options = 'org.springframework.integration.dsl.GenericEndpointSpec')
+					Closure<?> endpointConfigurer = null) {
+
+		controlBus endpointConfigurer
+	}
+
+	/**
+	 * Populate the {@code Control Bus} EI Pattern specific {@link MessageHandler} implementation
+	 * at the current {@link IntegrationFlow} chain position.
+	 * @param endpointConfigurer the {@link Consumer} to accept integration endpoint options.
+	 * @see GenericEndpointSpec
 	 */
 	GroovyIntegrationFlowDefinition controlBus(
 			@DelegatesTo(value = GenericEndpointSpec<ServiceActivatingHandler>, strategy = Closure.DELEGATE_FIRST)

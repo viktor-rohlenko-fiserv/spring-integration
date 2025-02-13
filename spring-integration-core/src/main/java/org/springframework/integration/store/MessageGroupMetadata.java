@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import org.springframework.util.Assert;
  * @author Gary Russell
  * @author Artem Bilan
  * @author Laszlo Szabo
+ * @author Ngoc Nhan
  *
  * @since 2.1
  */
@@ -40,6 +41,7 @@ public class MessageGroupMetadata implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
+	@SuppressWarnings("serial")
 	private final List<UUID> messageIds = new LinkedList<>();
 
 	private long timestamp;
@@ -91,7 +93,7 @@ public class MessageGroupMetadata implements Serializable {
 	}
 
 	public UUID firstId() {
-		if (this.messageIds.size() > 0) {
+		if (!this.messageIds.isEmpty()) {
 			return this.messageIds.get(0);
 		}
 		return null;

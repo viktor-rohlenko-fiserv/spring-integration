@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,6 +62,7 @@ import org.springframework.util.Assert;
  * @author Gary Russell
  * @author Alexandre Strubel
  * @author Ruslan Stelmachenko
+ * @author Eddie Cho
  *
  * @since 4.3
  */
@@ -305,6 +306,19 @@ public class DefaultLockRepository
 		return this.renewQuery;
 	}
 
+	/**
+	 * The flag to perform a database check query on start or not.
+	 * @param checkDatabaseOnStart false to not perform the database check.
+	 * @since 6.2
+	 */
+	public void setCheckDatabaseOnStart(boolean checkDatabaseOnStart) {
+		this.checkDatabaseOnStart = checkDatabaseOnStart;
+		if (!checkDatabaseOnStart) {
+			LOGGER.info("The 'DefaultLockRepository' won't be started automatically " +
+					"and required table is not going be checked.");
+		}
+	}
+
 	@Override
 	public void afterPropertiesSet() {
 		this.deleteQuery = String.format(this.deleteQuery, this.prefix);
@@ -347,19 +361,6 @@ public class DefaultLockRepository
 		this.readCommittedTransactionTemplate = new TransactionTemplate(this.transactionManager, transactionDefinition);
 	}
 
-	/**
-	 * The flag to perform a database check query on start or not.
-	 * @param checkDatabaseOnStart false to not perform the database check.
-	 * @since 6.2
-	 */
-	public void setCheckDatabaseOnStart(boolean checkDatabaseOnStart) {
-		this.checkDatabaseOnStart = checkDatabaseOnStart;
-		if (!checkDatabaseOnStart) {
-			LOGGER.info("The 'DefaultLockRepository' won't be started automatically " +
-					"and required table is not going be checked.");
-		}
-	}
-
 	@Override
 	public boolean isAutoStartup() {
 		return this.checkDatabaseOnStart;
@@ -389,9 +390,9 @@ public class DefaultLockRepository
 	}
 
 	@Override
-	public void delete(String lock) {
-		this.defaultTransactionTemplate.executeWithoutResult(
-				transactionStatus -> this.template.update(this.deleteQuery, this.region, lock, this.id));
+	public boolean delete(String lock) {
+		return this.defaultTransactionTemplate.execute(
+				transactionStatus -> this.template.update(this.deleteQuery, this.region, lock, this.id)) == 1;
 	}
 
 	@Override
@@ -435,7 +436,7 @@ public class DefaultLockRepository
 	public boolean renew(String lock) {
 		final Boolean result = this.defaultTransactionTemplate.execute(
 				transactionStatus ->
-						this.template.update(this.renewQuery, epochMillis(), this.region, lock, this.id) > 0);
+						this.template.update(this.renewQuery, epochMillis(), this.region, lock, this.id) == 1);
 		return Boolean.TRUE.equals(result);
 	}
 

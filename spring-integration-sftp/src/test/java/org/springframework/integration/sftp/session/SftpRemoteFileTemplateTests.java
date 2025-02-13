@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 the original author or authors.
+ * Copyright 2014-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ import static org.mockito.Mockito.mock;
 /**
  * @author Gary Russell
  * @author Artem Bilan
+ * @author Darryl Smith
  * @since 4.1
  */
 @SpringJUnitConfig
@@ -85,7 +86,7 @@ public class SftpRemoteFileTemplateTests extends SftpTestSupport {
 		assertThat(template.exists("foo/foobar.txt")).isTrue();
 		template.executeWithClient((ClientCallbackWithoutResult<SftpClient>) client -> {
 			try {
-				SftpClient.Attributes file = client.lstat("foo/foobar.txt");
+				SftpClient.Attributes file = client.stat("foo/foobar.txt");
 				assertThat(file.getSize()).isEqualTo(6);
 			}
 			catch (IOException e) {
@@ -138,7 +139,7 @@ public class SftpRemoteFileTemplateTests extends SftpTestSupport {
 	}
 
 	@Test
-	public void renameWithOldSftpVersion() {
+	public void renameWithOldSftpVersion() throws Exception {
 		DefaultSftpSessionFactory factory = new DefaultSftpSessionFactory(false);
 		factory.setHost("localhost");
 		factory.setPort(port);
@@ -162,6 +163,8 @@ public class SftpRemoteFileTemplateTests extends SftpTestSupport {
 								"sftpSource/subSftpSource/subSftpSource1.txt"));
 
 		oldVersionSession.close();
+
+		factory.destroy();
 	}
 
 	@Test

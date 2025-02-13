@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2022 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
-import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.sshd.sftp.client.SftpClient;
@@ -75,7 +75,6 @@ import org.springframework.util.FileCopyUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -86,6 +85,7 @@ import static org.mockito.Mockito.verify;
 /**
  * @author Artem Bilan
  * @author Gary Russell
+ * @author Darryl Smith
  *
  * @since 3.0
  */
@@ -148,6 +148,9 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 	private DirectChannel inboundCallback;
 
 	@Autowired
+	private DirectChannel sendFileChannel;
+
+	@Autowired
 	private Config config;
 
 	@Autowired
@@ -163,7 +166,6 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 
 	@Test
 	public void testInt2866LocalDirectoryExpressionGET() {
-		Session<?> session = this.sessionFactory.getSession();
 		String dir = "sftpSource/";
 		long modified = setModifiedOnSource1();
 		this.inboundGet.send(new GenericMessage<Object>(dir + " sftpSource1.txt"));
@@ -181,7 +183,6 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		localFile = (File) result.getPayload();
 		assertThat(localFile.getPath().replaceAll(Matcher.quoteReplacement(File.separator), "/"))
 				.contains(dir.toUpperCase());
-		Session<?> session2 = this.sessionFactory.getSession();
 	}
 
 	@Test
@@ -282,12 +283,12 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		List<SftpFileInfo> files = (List<SftpFileInfo>) result.getPayload();
 		assertThat(files).hasSize(4);
 		assertThat(files.stream()
-				.map(fi -> fi.getFilename())
-				.collect(Collectors.toList())).contains(
-				" sftpSource1.txt",
-				"sftpSource2.txt",
-				"subSftpSource",
-				"subSftpSource/subSftpSource1.txt");
+				.map(SftpFileInfo::getFilename))
+				.contains(
+						" sftpSource1.txt",
+						"sftpSource2.txt",
+						"subSftpSource",
+						"subSftpSource/subSftpSource1.txt");
 	}
 
 	@Test
@@ -300,16 +301,16 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		List<SftpFileInfo> files = (List<SftpFileInfo>) result.getPayload();
 		assertThat(files).hasSize(8);
 		assertThat(files.stream()
-				.map(fi -> fi.getFilename())
-				.collect(Collectors.toList())).contains(
-				" sftpSource1.txt",
-				"sftpSource2.txt",
-				"subSftpSource",
-				"subSftpSource/subSftpSource1.txt",
-				".",
-				"..",
-				"subSftpSource/.",
-				"subSftpSource/..");
+				.map(SftpFileInfo::getFilename))
+				.contains(
+						" sftpSource1.txt",
+						"sftpSource2.txt",
+						"subSftpSource",
+						"subSftpSource/subSftpSource1.txt",
+						".",
+						"..",
+						"subSftpSource/.",
+						"subSftpSource/..");
 	}
 
 	@Test
@@ -322,11 +323,11 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		List<SftpFileInfo> files = (List<SftpFileInfo>) result.getPayload();
 		assertThat(files).hasSize(3);
 		assertThat(files.stream()
-				.map(fi -> fi.getFilename())
-				.collect(Collectors.toList())).contains(
-				" sftpSource1.txt",
-				"sftpSource2.txt",
-				"subSftpSource/subSftpSource1.txt");
+				.map(SftpFileInfo::getFilename))
+				.contains(
+						" sftpSource1.txt",
+						"sftpSource2.txt",
+						"subSftpSource/subSftpSource1.txt");
 		File newDeepFile = new File(this.sourceRemoteDirectory + "/subSftpSource/subSftpSource2.txt");
 		OutputStream fos = new FileOutputStream(newDeepFile);
 		fos.write("test".getBytes());
@@ -381,12 +382,12 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		FileCopyUtils.copy(session.readRaw("sftpSource/ sftpSource1.txt"), baos);
 		assertThat(session.finalizeRaw()).isTrue();
-		assertThat(new String(baos.toByteArray())).isEqualTo("source1");
+		assertThat(baos.toString()).isEqualTo("source1");
 
 		baos = new ByteArrayOutputStream();
 		FileCopyUtils.copy(session.readRaw("sftpSource/sftpSource2.txt"), baos);
 		assertThat(session.finalizeRaw()).isTrue();
-		assertThat(new String(baos.toByteArray())).isEqualTo("source2");
+		assertThat(baos.toString()).isEqualTo("source2");
 
 		session.close();
 	}
@@ -405,12 +406,12 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		FileCopyUtils.copy(session.readRaw("sftpTarget/sftpTarget2.txt"), baos);
 		assertThat(session.finalizeRaw()).isTrue();
-		assertThat(new String(baos.toByteArray())).isEqualTo("source2");
+		assertThat(baos.toString()).isEqualTo("source2");
 
 		baos = new ByteArrayOutputStream();
 		FileCopyUtils.copy(session.readRaw("sftpSource/sftpSource2.txt"), baos);
 		assertThat(session.finalizeRaw()).isTrue();
-		assertThat(new String(baos.toByteArray())).isEqualTo("source2");
+		assertThat(baos.toString()).isEqualTo("source2");
 
 		session.close();
 	}
@@ -425,7 +426,8 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		PipedOutputStream out2 = new PipedOutputStream(pipe2);
 		final CountDownLatch latch1 = new CountDownLatch(1);
 		final CountDownLatch latch2 = new CountDownLatch(1);
-		Executors.newSingleThreadExecutor().execute(() -> {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		executorService.execute(() -> {
 			try {
 				session1.write(pipe1, "foo.txt");
 			}
@@ -434,7 +436,7 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 			}
 			latch1.countDown();
 		});
-		Executors.newSingleThreadExecutor().execute(() -> {
+		executorService.execute(() -> {
 			try {
 				session2.write(pipe2, "bar.txt");
 			}
@@ -458,12 +460,13 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		ByteArrayOutputStream bos2 = new ByteArrayOutputStream();
 		session1.read("foo.txt", bos1);
 		session2.read("bar.txt", bos2);
-		assertThat(new String(bos1.toByteArray())).isEqualTo("ace");
-		assertThat(new String(bos2.toByteArray())).isEqualTo("bdf");
+		assertThat(bos1.toString()).isEqualTo("ace");
+		assertThat(bos2.toString()).isEqualTo("bdf");
 		session1.remove("foo.txt");
 		session2.remove("bar.txt");
 		session1.close();
 		session2.close();
+		executorService.shutdown();
 	}
 
 	@Test
@@ -621,6 +624,21 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 	}
 
 	@Test
+	public void autoCreateTemporaryDirectory() {
+		Message<String> m =
+				MessageBuilder.withPayload("test")
+						.setHeader(FileHeaders.FILENAME, "test.txt")
+						.build();
+		this.sendFileChannel.send(m);
+
+		SftpClient.DirEntry[] files = this.template.execute(session -> session.list("sftpTarget"));
+		// ., .., and file itself
+		assertThat(files).hasSize(3).extracting(SftpClient.DirEntry::getFilename).contains("test.txt");
+		files = this.template.execute(session -> session.list("sftpTarget_tmp"));
+		assertThat(files).hasSize(2); // . and ..
+	}
+
+	@Test
 	public void testInt3412FileMode() {
 		Message<String> m = MessageBuilder.withPayload("foo")
 				.setHeader(FileHeaders.FILENAME, "appending.txt")
@@ -633,14 +651,9 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 
 		ignoring.send(m);
 		assertLength6(template);
-		try {
-			failing.send(m);
-			fail("Expected exception");
-		}
-		catch (MessagingException e) {
-			assertThat(e.getCause().getCause().getMessage()).contains("The destination file already exists");
-		}
-
+		assertThatExceptionOfType(MessagingException.class)
+				.isThrownBy(() -> failing.send(m))
+				.withStackTraceContaining("The destination file already exists");
 	}
 
 	@Test
@@ -676,15 +689,15 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		assertThat(receive.getPayload()).isEqualTo("FOO");
 	}
 
-	private void assertLength6(SftpRemoteFileTemplate template) {
+	private static void assertLength6(SftpRemoteFileTemplate template) {
 		SftpClient.DirEntry[] files = template.execute(session -> session.list("sftpTarget"));
-		assertThat(files.length).isEqualTo(3);
+		assertThat(files).hasSize(3);
 		assertThat(files[2].getFilename()).isEqualTo("appending.txt");
 		assertThat(files[2].getAttributes().getSize()).isEqualTo(6);
 	}
 
 	@Test
-	public void testSessionExists() throws IOException {
+	public void testSessionExists() throws Exception {
 		DefaultSftpSessionFactory sessionFactory = new DefaultSftpSessionFactory();
 		sessionFactory.setHost("localhost");
 		sessionFactory.setPort(port);
@@ -701,7 +714,9 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		assertThatExceptionOfType(UncheckedIOException.class)
 				.isThrownBy(() -> session.exists("any"))
 				.withRootCauseInstanceOf(IOException.class)
-				.withStackTraceContaining("lstat(any) client is closed");
+				.withStackTraceContaining("canonicalPath(any) client is closed");
+
+		sessionFactory.destroy();
 	}
 
 	@SuppressWarnings("unused")
@@ -750,7 +765,7 @@ public class SftpServerOutboundTests extends SftpTestSupport {
 		public MessageChannel eventChannel() {
 			return (msg, timeout) -> {
 				if (this.latch != null) {
-					if (this.events.size() > 0 || msg.getPayload() instanceof SessionOpenedEvent) {
+					if (!this.events.isEmpty() || msg.getPayload() instanceof SessionOpenedEvent) {
 						this.events.add((ApacheMinaSftpEvent) msg.getPayload());
 						if (msg.getPayload() instanceof SessionClosedEvent) {
 							this.latch.countDown();

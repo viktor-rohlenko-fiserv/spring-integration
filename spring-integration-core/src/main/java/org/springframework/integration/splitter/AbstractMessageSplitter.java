@@ -52,6 +52,7 @@ import org.springframework.util.ObjectUtils;
  * @author Artem Bilan
  * @author Ruslan Stelmachenko
  * @author Gary Russell
+ * @author Ngoc Nhan
  */
 public abstract class AbstractMessageSplitter extends AbstractReplyProducingMessageHandler
 		implements DiscardingMessageHandler {
@@ -66,7 +67,7 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 	 * Set the applySequence flag to the specified value. Defaults to true.
 	 * @param applySequence true to apply sequence information.
 	 */
-	public void setApplySequence(boolean applySequence) {
+	public final void setApplySequence(boolean applySequence) {
 		this.applySequence = applySequence;
 	}
 
@@ -142,8 +143,7 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 	private Flux<?> prepareFluxResult(Message<?> message, Object result) {
 		int sequenceSize = 1;
 		Flux<?> flux = Flux.just(result);
-		if (result instanceof Iterable<?>) {
-			Iterable<Object> iterable = (Iterable<Object>) result;
+		if (result instanceof Iterable<?> iterable) {
 			sequenceSize = obtainSizeIfPossible(iterable);
 			flux = Flux.fromIterable(iterable);
 		}
@@ -152,18 +152,15 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 			sequenceSize = items.length;
 			flux = Flux.fromArray(items);
 		}
-		else if (result instanceof Iterator<?>) {
-			Iterator<Object> iter = (Iterator<Object>) result;
-			sequenceSize = obtainSizeIfPossible(iter);
-			flux = Flux.fromIterable(() -> iter);
+		else if (result instanceof Iterator<?> iterator) {
+			sequenceSize = obtainSizeIfPossible(iterator);
+			flux = Flux.fromIterable(() -> iterator);
 		}
-		else if (result instanceof Stream<?>) {
-			Stream<Object> stream = ((Stream<Object>) result);
+		else if (result instanceof Stream<?> stream) {
 			sequenceSize = 0;
 			flux = Flux.fromStream(stream);
 		}
-		else if (result instanceof Publisher<?>) {
-			Publisher<Object> publisher = (Publisher<Object>) result;
+		else if (result instanceof Publisher<?> publisher) {
 			sequenceSize = 0;
 			flux = Flux.from(publisher);
 		}
@@ -187,8 +184,7 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 		int sequenceSize = 1;
 		Iterator<?> iterator = Collections.singleton(result).iterator();
 
-		if (result instanceof Iterable<?>) {
-			Iterable<Object> iterable = (Iterable<Object>) result;
+		if (result instanceof Iterable<?> iterable) {
 			sequenceSize = obtainSizeIfPossible(iterable);
 			iterator = iterable.iterator();
 		}
@@ -197,19 +193,17 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 			sequenceSize = items.length;
 			iterator = Arrays.asList(items).iterator();
 		}
-		else if (result instanceof Iterator<?>) {
-			Iterator<Object> iter = (Iterator<Object>) result;
+		else if (result instanceof Iterator<?> iter) {
 			sequenceSize = obtainSizeIfPossible(iter);
 			iterator = iter;
 		}
-		else if (result instanceof Stream<?>) {
-			Stream<Object> stream = ((Stream<Object>) result);
+		else if (result instanceof Stream<?> stream) {
 			sequenceSize = 0;
 			iterator = stream.iterator();
 		}
-		else if (result instanceof Publisher<?>) {
+		else if (result instanceof Publisher<?> publisher) {
 			sequenceSize = 0;
-			iterator = Flux.from((Publisher<?>) result).toIterable().iterator();
+			iterator = Flux.from(publisher).toIterable().iterator();
 		}
 
 		if (!iterator.hasNext()) {
@@ -223,7 +217,7 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 		Function<Object, ?> messageBuilderFunction = prepareMessageBuilderFunction(message, sequenceSize);
 
 		return new FunctionIterator<>(
-				result instanceof AutoCloseable && !result.equals(iterator) ? (AutoCloseable) result : null,
+				result instanceof AutoCloseable autoCloseable && !result.equals(iterator) ? autoCloseable : null,
 				iterator, messageBuilderFunction);
 	}
 
@@ -250,8 +244,8 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 	 * @since 5.0
 	 */
 	protected int obtainSizeIfPossible(Iterable<?> iterable) {
-		if (iterable instanceof Collection) {
-			return ((Collection<?>) iterable).size();
+		if (iterable instanceof Collection<?> collection) {
+			return collection.size();
 		}
 		else if (JacksonPresent.isJackson2Present() && JacksonNodeHelper.isNode(iterable)) {
 			return JacksonNodeHelper.nodeSize(iterable);
@@ -314,17 +308,16 @@ public abstract class AbstractMessageSplitter extends AbstractReplyProducingMess
 
 	@Override
 	protected void produceOutput(Object result, Message<?> requestMessage) {
-		if (result instanceof Iterator<?>) {
-			Iterator<?> iterator = (Iterator<?>) result;
+		if (result instanceof Iterator<?> iterator) {
 			try {
 				while (iterator.hasNext()) {
 					super.produceOutput(iterator.next(), requestMessage);
 				}
 			}
 			finally {
-				if (iterator instanceof AutoCloseable) {
+				if (iterator instanceof AutoCloseable autoCloseable) {
 					try {
-						((AutoCloseable) iterator).close();
+						autoCloseable.close();
 					}
 					catch (Exception e) {
 						// ignored

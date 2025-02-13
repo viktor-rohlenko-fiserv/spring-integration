@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,8 @@ import org.springframework.util.ObjectUtils;
  * @author Artem Bilan
  * @author Dominik Simmen
  * @author Yuxin Wang
+ * @author Ngoc Nhan
+ * @author Filip Hrisafov
  */
 public abstract class AbstractMailReceiver extends IntegrationObjectSupport implements MailReceiver, DisposableBean {
 
@@ -111,6 +113,8 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 	private boolean simpleContent;
 
 	private boolean autoCloseFolder = true;
+
+	private boolean flaggedAsFallback = true;
 
 	private volatile Store store;
 
@@ -289,6 +293,16 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 	 */
 	public void setAutoCloseFolder(boolean autoCloseFolder) {
 		this.autoCloseFolder = autoCloseFolder;
+	}
+
+	/**
+	 * Whether the {@link Flags.Flag#FLAGGED} flag should be added to the message
+	 * when {@code \Recent} or user flags are not supported on mail server.
+	 * @param flaggedAsFallback {@code false} to not add {@link Flags.Flag#FLAGGED} flag as a fallback.
+	 * @since 6.4
+	 */
+	public void setFlaggedAsFallback(boolean flaggedAsFallback) {
+		this.flaggedAsFallback = flaggedAsFallback;
 	}
 
 	protected Folder getFolder() {
@@ -474,19 +488,19 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 					headers.put(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE);
 				}
 			}
-			else if (content instanceof InputStream) {
+			else if (content instanceof InputStream inputStream) {
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				FileCopyUtils.copy((InputStream) content, baos);
+				FileCopyUtils.copy(inputStream, baos);
 				content = byteArrayToContent(headers, baos);
 			}
-			else if (content instanceof Multipart && this.embeddedPartsAsBytes) {
+			else if (content instanceof Multipart multipart && this.embeddedPartsAsBytes) {
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				((Multipart) content).writeTo(baos);
+				multipart.writeTo(baos);
 				content = byteArrayToContent(headers, baos);
 			}
-			else if (content instanceof Part && this.embeddedPartsAsBytes) {
+			else if (content instanceof Part part && this.embeddedPartsAsBytes) {
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				((Part) content).writeTo(baos);
+				part.writeTo(baos);
 				content = byteArrayToContent(headers, baos);
 			}
 			return content;
@@ -502,17 +516,29 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 	}
 
 	private void postProcessFilteredMessages(Message[] filteredMessages) throws MessagingException {
-		setMessageFlags(filteredMessages);
-
-		if (shouldDeleteMessages()) {
-			deleteMessages(filteredMessages);
-		}
 		// Copy messages to cause an eager fetch
+		Message[] messages = filteredMessages;
 		if (this.headerMapper == null && (this.autoCloseFolder || this.simpleContent)) {
+			messages = new Message[filteredMessages.length];
 			for (int i = 0; i < filteredMessages.length; i++) {
-				MimeMessage mimeMessage = new IntegrationMimeMessage((MimeMessage) filteredMessages[i]);
+				Message originalMessage = filteredMessages[i];
+				messages[i] = originalMessage;
+				MimeMessage mimeMessage = new IntegrationMimeMessage((MimeMessage) originalMessage);
 				filteredMessages[i] = mimeMessage;
 			}
+		}
+
+		setMessageFlagsAndMaybeDeleteMessages(messages);
+		if (filteredMessages.length > 0 && filteredMessages[0] instanceof IntegrationMimeMessage) {
+			setMessageFlagsAndMaybeDeleteMessages(filteredMessages);
+		}
+	}
+
+	private void setMessageFlagsAndMaybeDeleteMessages(Message[] messages) throws MessagingException {
+		setMessageFlags(messages);
+
+		if (shouldDeleteMessages()) {
+			deleteMessages(messages);
 		}
 	}
 
@@ -533,7 +559,7 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 					siFlags.add(this.userFlag);
 					message.setFlags(siFlags, true);
 				}
-				else {
+				else if (this.flaggedAsFallback) {
 					this.logger.debug("USER flags are not supported by this mail server. " +
 							"Flagging message with system flag");
 					message.setFlag(Flags.Flag.FLAGGED, true);
@@ -543,10 +569,6 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 		}
 	}
 
-	/**
-	 * Will filter Messages thru selector. Messages that did not pass selector filtering criteria
-	 * will be filtered out and remain on the server as never touched.
-	 */
 	private MimeMessage[] filterMessagesThruSelector(Message[] messages) throws MessagingException {
 		List<MimeMessage> filteredMessages = new LinkedList<>();
 		for (Message message1 : messages) {
@@ -556,13 +578,13 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 						this.selectorExpression.getValue(this.evaluationContext, message, Boolean.class))) {
 					filteredMessages.add(message);
 				}
-				else if (this.logger.isDebugEnabled()) {
+				else {
 					if (message.isExpunged()) {
 						this.logger.debug("Expunged message discarded and will not be further processed.");
 					}
 					else {
 						String subject = message.getSubject();
-						this.logger.debug("Fetched email with subject '" + subject +
+						this.logger.debug(() -> "Fetched email with subject '" + subject +
 								"' will be discarded by the matching filter and will not be flagged as SEEN.");
 					}
 				}
@@ -575,7 +597,7 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 	}
 
 	/**
-	 * Fetches the specified messages from this receiver's folder. Default
+	 * Fetch the specified messages from this receiver's folder. Default
 	 * implementation {@link Folder#fetch(Message[], FetchProfile) fetches}
 	 * every {@link jakarta.mail.FetchProfile.Item}.
 	 * @param messages the messages to fetch
@@ -590,7 +612,7 @@ public abstract class AbstractMailReceiver extends IntegrationObjectSupport impl
 	}
 
 	/**
-	 * Deletes the given messages from this receiver's folder.
+	 * Delete the given messages from this receiver's folder.
 	 * @param messages the messages to delete
 	 * @throws MessagingException in case of JavaMail errors
 	 */

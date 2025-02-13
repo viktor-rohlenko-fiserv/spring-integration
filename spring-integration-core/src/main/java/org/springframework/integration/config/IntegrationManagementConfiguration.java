@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2022 the original author or authors.
+ * Copyright 2015-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@
 
 package org.springframework.integration.config;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import io.micrometer.observation.ObservationRegistry;
 
@@ -32,6 +33,7 @@ import org.springframework.context.annotation.Role;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotationMetadata;
+import org.springframework.integration.support.management.ControlBusCommandRegistry;
 import org.springframework.integration.support.management.metrics.MetricsCaptor;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -51,9 +53,15 @@ import org.springframework.util.StringUtils;
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class IntegrationManagementConfiguration implements ImportAware, EnvironmentAware {
 
+	private final ControlBusCommandRegistry controlBusCommandRegistry;
+
 	private AnnotationAttributes attributes;
 
 	private Environment environment;
+
+	public IntegrationManagementConfiguration(ControlBusCommandRegistry controlBusCommandRegistry) {
+		this.controlBusCommandRegistry = controlBusCommandRegistry;
+	}
 
 	@Override
 	public void setEnvironment(Environment environment) {
@@ -66,6 +74,9 @@ public class IntegrationManagementConfiguration implements ImportAware, Environm
 		this.attributes = AnnotationAttributes.fromMap(map);
 		Assert.notNull(this.attributes, () ->
 				"@EnableIntegrationManagement is not present on importing class " + importMetadata.getClassName());
+		this.controlBusCommandRegistry.setEagerInitialization(
+				Boolean.parseBoolean(
+						this.environment.resolvePlaceholders(this.attributes.getString("loadControlBusCommands"))));
 	}
 
 	@Bean(name = IntegrationManagementConfigurer.MANAGEMENT_CONFIGURER_NAME)
@@ -88,16 +99,26 @@ public class IntegrationManagementConfiguration implements ImportAware, Environm
 	}
 
 	private String[] obtainObservationPatterns() {
-		Set<String> observationPatterns = new HashSet<>();
+		Collection<String> observationPatterns = new HashSet<>();
 		String[] patternsProperties = (String[]) this.attributes.get("observationPatterns");
+		boolean hasAsterisk = false;
 		for (String patternProperty : patternsProperties) {
 			String patternValue = this.environment.resolvePlaceholders(patternProperty);
 			String[] patternsToProcess = StringUtils.commaDelimitedListToStringArray(patternValue);
 			for (String pattern : patternsToProcess) {
-				if (StringUtils.hasText(pattern)) {
+				hasAsterisk |= "*".equals(pattern);
+				if (StringUtils.hasText(pattern) && (pattern.startsWith("!") || !hasAsterisk)) {
 					observationPatterns.add(pattern);
 				}
 			}
+		}
+		if (hasAsterisk) {
+			observationPatterns =
+					observationPatterns.stream()
+							.filter((pattern) -> pattern.startsWith("!"))
+							.collect(Collectors.toList());
+
+			observationPatterns.add("*");
 		}
 		return observationPatterns.toArray(new String[0]);
 	}

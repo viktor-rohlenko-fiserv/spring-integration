@@ -4698,10 +4698,20 @@ The list of component name patterns you want to track (e.g.,  tracked-components
 			</xsd:documentation>
 		</xsd:annotation>
 		<xsd:complexType>
-			<xsd:choice minOccurs="1" maxOccurs="unbounded">
-				<xsd:element ref="beans:bean"/>
-				<xsd:element ref="beans:ref"/>
-			</xsd:choice>
+			<xsd:sequence>
+				<xsd:element name="index-accessors" minOccurs="0">
+					<xsd:complexType>
+						<xsd:choice maxOccurs="unbounded">
+							<xsd:element ref="beans:bean"/>
+							<xsd:element ref="beans:ref"/>
+						</xsd:choice>
+					</xsd:complexType>
+				</xsd:element>
+				<xsd:choice minOccurs="0" maxOccurs="unbounded">
+					<xsd:element ref="beans:bean"/>
+					<xsd:element ref="beans:ref"/>
+				</xsd:choice>
+			</xsd:sequence>
 		</xsd:complexType>
 	</xsd:element>
 
@@ -4968,6 +4978,15 @@ The list of component name patterns you want to track (e.g.,  tracked-components
 			]]></xsd:documentation>
 		</xsd:annotation>
 		<xsd:attribute name="id" type="xsd:string"/>
+		<xsd:attribute name="use-registry" type="xsd:boolean">
+			<xsd:annotation>
+				<xsd:documentation>
+					[DEPRECATED]
+					The attribute is out of use since 6.5 and 'ControlBusCommandRegistry' is always configured.
+					Will be removed in the next version.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
 	</xsd:complexType>
 
 	<xsd:complexType name="retryAdviceType">

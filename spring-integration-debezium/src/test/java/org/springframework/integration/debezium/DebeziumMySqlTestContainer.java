@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2023 the original author or authors.
+ * Copyright 2023-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.integration.debezium;
 
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.MySQLContainer;
@@ -37,7 +38,7 @@ public interface DebeziumMySqlTestContainer {
 
 	MySQLContainer<?> DEBEZIUM_MYSQL =
 			new MySQLContainer<>(
-					DockerImageName.parse("debezium/example-mysql:2.2.0.Final")
+					DockerImageName.parse("debezium/example-mysql:3.0.0.Final")
 							.asCompatibleSubstituteFor("mysql"))
 					.withUsername("mysqluser")
 					.withPassword("mysqlpw");
@@ -70,7 +71,7 @@ public interface DebeziumMySqlTestContainer {
 		// Topic prefix for the database server or cluster.
 		config.put("topic.prefix", "my-topic-" + uuid);
 		// Unique ID of the connector.
-		config.put("database.server.id", "" + (uuid.getMostSignificantBits() & Long.MAX_VALUE));
+		config.put("database.server.id", "" + Math.abs(ThreadLocalRandom.current().nextInt()));
 
 		config.put("key.converter.schemas.enable", "false");
 		config.put("value.converter.schemas.enable", "false");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ package org.springframework.integration.scripting.jsr223;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.springframework.integration.scripting.PolyglotScriptExecutor;
 import org.springframework.integration.scripting.ScriptExecutor;
 import org.springframework.util.Assert;
@@ -33,9 +36,18 @@ import org.springframework.util.Assert;
  */
 public final class ScriptExecutorFactory {
 
+	private static final Log LOGGER = LogFactory.getLog(ScriptExecutorFactory.class);
+
 	public static ScriptExecutor getScriptExecutor(String language) {
-		if (language.equalsIgnoreCase("python") || language.equalsIgnoreCase("jython")) {
-			return new PythonScriptExecutor();
+		if (language.equalsIgnoreCase("jython")) {
+			LOGGER.warn("""
+					The 'jython' language indicator is deprecated and will be removed in the next version.
+					The Python support is fully based on GraalVM Polyglot and there is no 'jython' dependency requirement any more.
+					""");
+			return new PolyglotScriptExecutor("python");
+		}
+		else if (language.equalsIgnoreCase("python")) {
+			return new PolyglotScriptExecutor("python");
 		}
 		else if (language.equalsIgnoreCase("ruby") || language.equalsIgnoreCase("jruby")) {
 			return new RubyScriptExecutor();
@@ -56,11 +68,16 @@ public final class ScriptExecutorFactory {
 		int index = scriptLocation.lastIndexOf('.') + 1;
 		Assert.state(index > 0, () -> "Unable to determine language for script '" + scriptLocation + "'");
 		String extension = scriptLocation.substring(index);
-		if (extension.equals("kts")) {
-			return "kotlin";
-		}
-		else if (extension.equals("js")) {
-			return "js";
+		switch (extension) {
+			case "kts" -> {
+				return "kotlin";
+			}
+			case "js" -> {
+				return "js";
+			}
+			case "py" -> {
+				return "python";
+			}
 		}
 		ScriptEngineManager engineManager = new ScriptEngineManager();
 		ScriptEngine engine = engineManager.getEngineByExtension(extension);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.util.net.SshdSocketAddress;
 import org.apache.sshd.sftp.SftpModuleProperties;
 import org.apache.sshd.sftp.client.SftpClient;
@@ -47,6 +48,7 @@ import org.springframework.util.StringUtils;
  * @author Gary Russell
  * @author Artem Bilan
  * @author Christian Tzolov
+ * @author Darryl Smith
  * @since 2.0
  */
 public class SftpSession implements Session<SftpClient.DirEntry> {
@@ -99,7 +101,7 @@ public class SftpSession implements Session<SftpClient.DirEntry> {
 		boolean isPattern = remoteFile != null && remoteFile.contains("*");
 
 		if (!isPattern && remoteFile != null) {
-			SftpClient.Attributes attributes = this.sftpClient.lstat(path);
+			SftpClient.Attributes attributes = this.sftpClient.stat(path);
 			if (!attributes.isDirectory()) {
 				return Stream.of(new SftpClient.DirEntry(remoteFile, path, attributes));
 			}
@@ -107,23 +109,24 @@ public class SftpSession implements Session<SftpClient.DirEntry> {
 				remoteDir = remotePath;
 			}
 		}
-		remoteDir =
-				!remoteDir.isEmpty() && remoteDir.charAt(0) == '/'
-						? remoteDir
-						: this.sftpClient.canonicalPath(remoteDir);
+		remoteDir = normalizePath(remoteDir);
 		return StreamSupport.stream(this.sftpClient.readDir(remoteDir).spliterator(), false)
 				.filter((entry) -> !isPattern || PatternMatchUtils.simpleMatch(remoteFile, entry.getFilename()));
 	}
 
 	@Override
 	public void read(String source, OutputStream os) throws IOException {
-		InputStream is = this.sftpClient.read(source);
+		InputStream is = readRaw(source);
 		FileCopyUtils.copy(is, os);
 	}
 
 	@Override
 	public InputStream readRaw(String source) throws IOException {
-		return this.sftpClient.read(source);
+		return this.sftpClient.read(normalizePath(source));
+	}
+
+	private String normalizePath(String path) throws IOException {
+		return !path.isEmpty() && path.charAt(0) == '/' ? path : this.sftpClient.canonicalPath(path);
 	}
 
 	@Override
@@ -154,6 +157,16 @@ public class SftpSession implements Session<SftpClient.DirEntry> {
 		}
 		catch (IOException ex) {
 			throw new UncheckedIOException("failed to close an SFTP client", ex);
+		}
+
+		try {
+			ClientSession session = this.sftpClient.getSession();
+			if (session != null && session.isOpen()) {
+				session.close();
+			}
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException("failed to close an SFTP client (session)", ex);
 		}
 	}
 
@@ -188,7 +201,7 @@ public class SftpSession implements Session<SftpClient.DirEntry> {
 	@Override
 	public boolean exists(String path) {
 		try {
-			this.sftpClient.lstat(path);
+			this.sftpClient.stat(normalizePath(path));
 			return true;
 		}
 		catch (SftpException ex) {

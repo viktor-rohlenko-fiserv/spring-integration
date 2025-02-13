@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023 the original author or authors.
+ * Copyright 2016-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportResource;
 import org.springframework.context.annotation.ImportRuntimeHints;
+import org.springframework.context.annotation.Primary;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.integration.annotation.Filter;
 import org.springframework.integration.annotation.InboundChannelAdapter;
@@ -80,6 +81,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.mockito.Mockito.mock;
 
 /**
  * @author Gary Russell
@@ -290,14 +292,21 @@ public class IntegrationGraphServerTests {
 
 	@Configuration
 	@EnableIntegration
-	@EnableIntegrationManagement(observationPatterns = "myFilter")
+	@EnableIntegrationManagement(observationPatterns = { "myFilter", "*" })
 	@IntegrationComponentScan
 	@ImportResource("org/springframework/integration/graph/integration-graph-context.xml")
 	public static class Config {
 
 		@Bean
+		@Primary
 		public static MeterRegistry meterRegistry() {
 			return new SimpleMeterRegistry();
+		}
+
+		// To be sure that @Primary one wins for the MicrometerNodeEnhancer
+		@Bean
+		public static MeterRegistry mockRegistry() {
+			return mock();
 		}
 
 		@Bean

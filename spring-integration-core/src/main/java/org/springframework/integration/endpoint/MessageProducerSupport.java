@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ public abstract class MessageProducerSupport extends AbstractEndpoint
 	private volatile Subscription subscription;
 
 	protected MessageProducerSupport() {
-		this.setPhase(Integer.MAX_VALUE / 2);
+		setPhase(Integer.MAX_VALUE / 2);
 	}
 
 	@Override
@@ -222,7 +222,6 @@ public abstract class MessageProducerSupport extends AbstractEndpoint
 		if (beanFactory != null) {
 			this.messagingTemplate.setBeanFactory(beanFactory);
 		}
-
 	}
 
 	/**
@@ -257,7 +256,7 @@ public abstract class MessageProducerSupport extends AbstractEndpoint
 			IntegrationObservation.HANDLER.observation(
 							this.observationConvention,
 							DefaultMessageReceiverObservationConvention.INSTANCE,
-							() -> new MessageReceiverContext(message, getComponentName()),
+							() -> new MessageReceiverContext(message, getComponentName(), "message-producer"),
 							this.observationRegistry)
 					.observe(() -> this.messagingTemplate.send(getRequiredOutputChannel(), trackMessageIfAny(message)));
 		}
@@ -278,8 +277,8 @@ public abstract class MessageProducerSupport extends AbstractEndpoint
 						.doOnCancel(this::stop)
 						.doOnSubscribe((subs) -> this.subscription = subs);
 
-		if (channelForSubscription instanceof ReactiveStreamsSubscribableChannel) {
-			((ReactiveStreamsSubscribableChannel) channelForSubscription).subscribeTo(messageFlux);
+		if (channelForSubscription instanceof ReactiveStreamsSubscribableChannel reactiveStreamsSubscribableChannel) {
+			reactiveStreamsSubscribableChannel.subscribeTo(messageFlux);
 		}
 		else {
 			messageFlux

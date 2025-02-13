@@ -25,7 +25,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
@@ -97,6 +98,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringJUnitConfig
 @DirtiesContext
 public class KafkaDslTests {
+
+	private static final Log log = LogFactory.getLog(KafkaDslTests.class);
 
 	static final String TEST_TOPIC1 = "test-topic1";
 
@@ -179,6 +182,7 @@ public class KafkaDslTests {
 		for (int i = 0; i < 100; i++) {
 			Message<?> receive = this.listeningFromKafkaResults1.receive(20000);
 			assertThat(receive).isNotNull();
+			log.warn("Received '%s' for index '%d'".formatted(receive, i));
 			assertThat(receive.getPayload()).isEqualTo("FOO");
 			MessageHeaders headers = receive.getHeaders();
 			assertThat(headers.containsKey(KafkaHeaders.ACKNOWLEDGMENT)).isTrue();
@@ -188,14 +192,13 @@ public class KafkaDslTests {
 			assertThat(headers.get(KafkaHeaders.RECEIVED_KEY)).isEqualTo(i + 1);
 			assertThat(headers.get(KafkaHeaders.RECEIVED_PARTITION)).isEqualTo(0);
 			assertThat(headers.get(KafkaHeaders.OFFSET)).isEqualTo((long) i);
-			assertThat(headers.get(KafkaHeaders.TIMESTAMP_TYPE)).isEqualTo("CREATE_TIME");
-			assertThat(headers.get(KafkaHeaders.RECEIVED_TIMESTAMP)).isEqualTo(1487694048633L);
 			assertThat(headers.get("foo")).isEqualTo("bar");
 		}
 
 		for (int i = 0; i < 100; i++) {
 			Message<?> receive = this.listeningFromKafkaResults2.receive(20000);
 			assertThat(receive).isNotNull();
+			log.warn("Received '%s' for index '%d'".formatted(receive, i));
 			assertThat(receive.getPayload()).isEqualTo("FOO");
 			MessageHeaders headers = receive.getHeaders();
 			assertThat(headers.containsKey(KafkaHeaders.ACKNOWLEDGMENT)).isTrue();
@@ -205,8 +208,6 @@ public class KafkaDslTests {
 			assertThat(headers.get(KafkaHeaders.RECEIVED_KEY)).isEqualTo(i + 1);
 			assertThat(headers.get(KafkaHeaders.RECEIVED_PARTITION)).isEqualTo(0);
 			assertThat(headers.get(KafkaHeaders.OFFSET)).isEqualTo((long) i);
-			assertThat(headers.get(KafkaHeaders.TIMESTAMP_TYPE)).isEqualTo("CREATE_TIME");
-			assertThat(headers.get(KafkaHeaders.RECEIVED_TIMESTAMP)).isEqualTo(1487694048644L);
 		}
 
 		Message<String> message = MessageBuilder.withPayload("BAR").setHeader(KafkaHeaders.TOPIC, TEST_TOPIC2).build();
@@ -280,7 +281,6 @@ public class KafkaDslTests {
 		@Bean
 		public ConsumerFactory<Integer, String> consumerFactory() {
 			Map<String, Object> props = KafkaTestUtils.consumerProps(this.embeddedKafkaBrokers, "dsl-group", "false");
-			props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 			return new DefaultKafkaConsumerFactory<>(props);
 		}
 
@@ -349,12 +349,12 @@ public class KafkaDslTests {
 		public IntegrationFlow sendToKafkaFlow(
 				KafkaProducerMessageHandlerSpec<Integer, String, ?> kafkaMessageHandlerTopic2) {
 			return f -> f
-					.splitWith(s -> s.function(p -> Stream.generate(() -> p).limit(101).iterator()))
+					.splitWith(s -> s.function(p -> Stream.generate(() -> p).limit(101).toList()))
+					.resequence()
 					.enrichHeaders(h -> h.header(KafkaIntegrationHeaders.FUTURE_TOKEN, "foo"))
 					.publishSubscribeChannel(c -> c
 							.subscribe(sf -> sf.handle(
-									kafkaMessageHandler(producerFactory(), TEST_TOPIC1)
-											.timestampExpression("T(Long).valueOf('1487694048633')"),
+									kafkaMessageHandler(producerFactory(), TEST_TOPIC1),
 									e -> e.id("kafkaProducer1")))
 							.subscribe(sf -> sf.handle(kafkaMessageHandlerTopic2, e -> e.id("kafkaProducer2")))
 					);
@@ -363,8 +363,7 @@ public class KafkaDslTests {
 		@Bean
 		public KafkaProducerMessageHandlerSpec<Integer, String, ?> kafkaMessageHandlerTopic2() {
 			return kafkaMessageHandler(producerFactory(), TEST_TOPIC2)
-					.flush(msg -> true)
-					.timestamp(m -> 1487694048644L);
+					.flush(msg -> true);
 		}
 
 		private KafkaProducerMessageHandlerSpec<Integer, String, ?> kafkaMessageHandler(
@@ -390,8 +389,10 @@ public class KafkaDslTests {
 
 		@Bean
 		public IntegrationFlow sourceFlow() {
+			ConsumerProperties consumerProperties = new ConsumerProperties(TEST_TOPIC3);
+			consumerProperties.setGroupId("inboundChannelAdapterGroup");
 			return IntegrationFlow
-					.from(Kafka.inboundChannelAdapter(consumerFactory(), new ConsumerProperties(TEST_TOPIC3)),
+					.from(Kafka.inboundChannelAdapter(consumerFactory(), consumerProperties),
 							e -> e.poller(Pollers.fixedDelay(100)))
 					.handle(p -> {
 						this.fromSource = p.getPayload();

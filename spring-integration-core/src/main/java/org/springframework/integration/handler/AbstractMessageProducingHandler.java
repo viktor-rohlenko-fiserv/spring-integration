@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 the original author or authors.
+ * Copyright 2014-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,12 +30,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 import org.reactivestreams.Publisher;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.ReactiveAdapter;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.convert.ConversionService;
@@ -47,6 +49,7 @@ import org.springframework.integration.core.MessagingTemplate;
 import org.springframework.integration.routingslip.RoutingSlipRouteStrategy;
 import org.springframework.integration.support.AbstractIntegrationMessageBuilder;
 import org.springframework.integration.support.utils.IntegrationUtils;
+import org.springframework.integration.util.IntegrationReactiveUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -66,8 +69,9 @@ import org.springframework.util.StringUtils;
  * @author Artem Bilan
  * @author Gary Russell
  * @author Marius Bogoevici
+ * @author Ngoc Nhan
  *
- * since 4.1
+ * @since 4.1
  */
 public abstract class AbstractMessageProducingHandler extends AbstractMessageHandler
 		implements MessageProducer, HeaderPropagationAware {
@@ -317,7 +321,6 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		return replyChannel;
 	}
 
-	@SuppressWarnings("deprecation")
 	private void doProduceOutput(Message<?> requestMessage, MessageHeaders requestHeaders, Object reply,
 			@Nullable Object replyChannelArg) {
 
@@ -327,9 +330,7 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		}
 
 		if (this.async) {
-			boolean isFutureReply =
-					reply instanceof org.springframework.util.concurrent.ListenableFuture<?> ||
-							reply instanceof CompletableFuture<?>;
+			boolean isFutureReply = reply instanceof CompletableFuture<?>;
 
 			ReactiveAdapter reactiveAdapter = null;
 			if (!isFutureReply) {
@@ -357,16 +358,17 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		sendOutput(createOutputMessage(reply, requestHeaders), replyChannel, false);
 	}
 
-	private static Publisher<?> toPublisherReply(Object reply, @Nullable ReactiveAdapter reactiveAdapter) {
+	private Publisher<?> toPublisherReply(Object reply, @Nullable ReactiveAdapter reactiveAdapter) {
 		if (reactiveAdapter != null) {
 			return reactiveAdapter.toPublisher(reply);
 		}
 		else {
-			return Mono.fromFuture(toCompletableFuture(reply));
+			return Mono.fromFuture((CompletableFuture<?>) reply);
 		}
 	}
 
-	private static CompletableFuture<?> toFutureReply(Object reply, @Nullable ReactiveAdapter reactiveAdapter) {
+	@SuppressWarnings("try")
+	private CompletableFuture<?> toFutureReply(Object reply, @Nullable ReactiveAdapter reactiveAdapter) {
 		if (reactiveAdapter != null) {
 			Mono<?> reactiveReply;
 			Publisher<?> publisher = reactiveAdapter.toPublisher(reply);
@@ -377,20 +379,40 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 				reactiveReply = Mono.from(publisher);
 			}
 
-			return reactiveReply.publishOn(Schedulers.boundedElastic()).toFuture();
-		}
-		else {
-			return toCompletableFuture(reply);
-		}
-	}
+			CompletableFuture<Object> replyFuture = new CompletableFuture<>();
 
-	@SuppressWarnings("deprecation")
-	private static CompletableFuture<?> toCompletableFuture(Object reply) {
-		if (reply instanceof CompletableFuture<?>) {
-			return (CompletableFuture<?>) reply;
+			reactiveReply
+					/*
+					The MonoToCompletableFuture in Project Reactor does not support context propagation,
+					 and it does not suppose to, since there is no guarantee how this Future is going to
+					 be handled downstream.
+					 However, in our case we process it directly in this class in the doProduceOutput()
+					 via whenComplete() callback. So, when value is set into the Future, it is available
+					 in the callback in the same thread immediately.
+					 */
+					.doOnEach((signal) -> {
+						try (AutoCloseable scope = IntegrationReactiveUtils
+								.setThreadLocalsFromReactorContext(signal.getContextView())) {
+
+							if (signal.isOnError()) {
+								replyFuture.completeExceptionally(signal.getThrowable());
+							}
+							else {
+								replyFuture.complete(signal.get());
+							}
+
+						}
+						catch (Exception ex) {
+							throw Exceptions.bubble(ex);
+						}
+					})
+					.contextCapture()
+					.subscribe();
+
+			return replyFuture;
 		}
 		else {
-			return ((org.springframework.util.concurrent.ListenableFuture<?>) reply).completable();
+			return (CompletableFuture<?>) reply;
 		}
 	}
 
@@ -426,8 +448,8 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		Object path = routingSlip.get(routingSlipIndex.get());
 		Object routingSlipPathValue = null;
 
-		if (path instanceof String) {
-			routingSlipPathValue = getBeanFactory().getBean((String) path);
+		if (path instanceof String string) {
+			routingSlipPathValue = getBeanFactory().getBean(string);
 		}
 		else if (path instanceof RoutingSlipRouteStrategy) {
 			routingSlipPathValue = path;
@@ -443,7 +465,7 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		}
 		else {
 			Object nextPath = ((RoutingSlipRouteStrategy) routingSlipPathValue).getNextPath(requestMessage, reply);
-			if (nextPath != null && (!(nextPath instanceof String) || StringUtils.hasText((String) nextPath))) {
+			if (nextPath != null && (!(nextPath instanceof String string) || StringUtils.hasText(string))) {
 				return nextPath;
 			}
 			else {
@@ -504,20 +526,20 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 			throw new DestinationResolutionException("no output-channel or replyChannel header available");
 		}
 
-		if (replyChannel instanceof MessageChannel) {
+		if (replyChannel instanceof MessageChannel messageChannel) {
 			if (output instanceof Message<?>) {
-				this.messagingTemplate.send((MessageChannel) replyChannel, (Message<?>) output);
+				this.messagingTemplate.send(messageChannel, (Message<?>) output);
 			}
 			else {
-				this.messagingTemplate.convertAndSend((MessageChannel) replyChannel, output);
+				this.messagingTemplate.convertAndSend(messageChannel, output);
 			}
 		}
-		else if (replyChannel instanceof String) {
+		else if (replyChannel instanceof String string) {
 			if (output instanceof Message<?>) {
-				this.messagingTemplate.send((String) replyChannel, (Message<?>) output);
+				this.messagingTemplate.send(string, (Message<?>) output);
 			}
 			else {
-				this.messagingTemplate.convertAndSend((String) replyChannel, output);
+				this.messagingTemplate.convertAndSend(string, output);
 			}
 		}
 		else {
@@ -579,6 +601,14 @@ public abstract class AbstractMessageProducingHandler extends AbstractMessageHan
 		BeanFactory beanFactory = getBeanFactory();
 		if (processor instanceof BeanFactoryAware beanFactoryAware && beanFactory != null) {
 			beanFactoryAware.setBeanFactory(beanFactory);
+		}
+		if (processor instanceof InitializingBean initializingBean) {
+			try {
+				initializingBean.afterPropertiesSet();
+			}
+			catch (Exception ex) {
+				throw new BeanCreationException("Cannot initialize processor for: " + this, ex);
+			}
 		}
 		if (!this.async && processor instanceof MethodInvokingMessageProcessor<?> methodInvokingMessageProcessor) {
 			this.async = methodInvokingMessageProcessor.isAsync();

@@ -39,6 +39,8 @@ import org.springframework.util.Assert;
  * @author Gary Russell
  * @author Artem Bilan
  * @author Christian Tzolov
+ * @author Ngoc Nhan
+ * @author Jooyoung Pyoung
  *
  * @since 2.0
  *
@@ -84,8 +86,9 @@ public class TcpNioClientConnectionFactory extends
 
 	@Override
 	protected TcpConnectionSupport buildNewConnection() {
+		SocketChannel socketChannel = null;
 		try {
-			SocketChannel socketChannel = SocketChannel.open();
+			socketChannel = SocketChannel.open();
 			setSocketAttributes(socketChannel.socket());
 			connect(socketChannel);
 			TcpNioConnection connection =
@@ -112,6 +115,14 @@ public class TcpNioClientConnectionFactory extends
 			return wrappedConnection;
 		}
 		catch (IOException e) {
+			try {
+				if (socketChannel != null) {
+					socketChannel.close();
+				}
+			}
+			catch (IOException e2) {
+				logger.error(e2, "Error closing socket channel");
+			}
 			throw new UncheckedIOException(e);
 		}
 		catch (InterruptedException e) {
@@ -210,7 +221,7 @@ public class TcpNioClientConnectionFactory extends
 		int selectionCount = 0;
 		try {
 			long timeout = Math.max(soTimeout, 0);
-			if (getDelayedReads().size() > 0 && (timeout == 0 || getReadDelay() < timeout)) {
+			if (!getDelayedReads().isEmpty() && (timeout == 0 || getReadDelay() < timeout)) {
 				timeout = getReadDelay();
 			}
 			selectionCount = this.selector.select(timeout);
