@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,47 +35,51 @@ import org.springframework.lang.NonNull;
  * @author Vennila Pazhamalai
  * @author Vivek Duraisamy
  * @since 6.4.x
- *
  * @see <a
  *     href="https://rohlenko.github.io/spring-integration-nats-site/gws-spring-integration-nats/index.html#stakeholders">See
  *     all stakeholders and contact</a>
  */
 public abstract class AbstractNatsMessageListenerContainer
-		implements SmartLifecycle, BeanNameAware, ApplicationContextAware {
+	implements SmartLifecycle, BeanNameAware, ApplicationContextAware {
 
 	protected final Object lifecycleMonitor = new Object();
-	@NonNull
-	protected final NatsConsumerFactory natsConsumerFactory;
-	@NonNull
-	protected final NatsMessageDeliveryMode natsMessageDeliveryMode;
+
+	@NonNull protected final NatsConsumerFactory natsConsumerFactory;
+
+	@NonNull protected final NatsMessageDeliveryMode natsMessageDeliveryMode;
+
 	protected MessageHandler messageHandler;
+
 	private String beanName;
+
 	private volatile boolean running = false;
+
 	private boolean autoStartup = true;
+
 	private ApplicationContext applicationContext;
 
 	/**
-	 * Construct an instance with the consumerFactory and default delivery mode PULL.
-	 *
-	 * @param pNatsConsumerFactory the NatsConsumerFactory bean with required information to create
-	 *     subscription and start polling for message
-	 */
+   * Construct an instance with the consumerFactory and default delivery mode PULL.
+   *
+   * @param pNatsConsumerFactory the NatsConsumerFactory bean with required information to create
+   *     subscription and start polling for message
+   */
 	public AbstractNatsMessageListenerContainer(
 			@NonNull final NatsConsumerFactory pNatsConsumerFactory) {
 		this.natsConsumerFactory = pNatsConsumerFactory;
 		this.natsMessageDeliveryMode = NatsMessageDeliveryMode.PULL;
 	}
-
 	/**
-	 * Construct an instance with the consumerFactory and delivery mode
-	 *
-	 * @param pNatsConsumerFactory NatsConsumerFactory bean with required information to create
-	 *     subscription and start polling for message
-	 * @param pNatsMessageDeliveryMode option to provide the message delivery mode
-	 */
+   * Construct an instance with the consumerFactory and delivery mode
+   *
+   * @param pNatsConsumerFactory NatsConsumerFactory bean with required information to create
+   *     subscription and start polling for message
+   * @param pNatsMessageDeliveryMode option to provide the message delivery mode
+   */
+
 	public AbstractNatsMessageListenerContainer(
-			@NonNull final NatsConsumerFactory pNatsConsumerFactory,
-			@NonNull final NatsMessageDeliveryMode pNatsMessageDeliveryMode) {
+		@NonNull final NatsConsumerFactory pNatsConsumerFactory,
+		@NonNull final NatsMessageDeliveryMode pNatsMessageDeliveryMode) {
 		this.natsConsumerFactory = pNatsConsumerFactory;
 		this.natsMessageDeliveryMode = pNatsMessageDeliveryMode;
 	}
@@ -88,8 +92,8 @@ public abstract class AbstractNatsMessageListenerContainer
 	public void start() {
 		synchronized (this.lifecycleMonitor) {
 			if (!isRunning()) {
-				doStart();
-			}
+			doStart();
+		}
 		}
 	}
 
@@ -105,16 +109,14 @@ public abstract class AbstractNatsMessageListenerContainer
 					final CountDownLatch latch = new CountDownLatch(1);
 					doStop(latch::countDown);
 					try {
-						latch.await(5000, TimeUnit.MILLISECONDS); // NOSONAR
+						latch.await(5000, TimeUnit.MILLISECONDS);
 					}
-					catch (
-							@SuppressWarnings("unused") final InterruptedException e) {
+					catch (final InterruptedException e) {
 						Thread.currentThread().interrupt();
 					}
 				}
 				else {
-					doStop(() -> {
-					});
+					doStop(() -> { });
 				}
 			}
 		}
@@ -165,15 +167,15 @@ public abstract class AbstractNatsMessageListenerContainer
 
 	@Override
 	public void setApplicationContext(final ApplicationContext pApplicationContext)
-			throws BeansException {
+		throws BeansException {
 		this.applicationContext = pApplicationContext;
 	}
 
 	/**
-	 * Sets the messageHandler reference
-	 *
-	 * @param pMessageHandler the messageHandler
-	 */
+   * Sets the messageHandler reference
+   *
+   * @param pMessageHandler the messageHandler
+   */
 	public void setMessageHandler(@NonNull final MessageHandler pMessageHandler) {
 		this.messageHandler = pMessageHandler;
 	}
