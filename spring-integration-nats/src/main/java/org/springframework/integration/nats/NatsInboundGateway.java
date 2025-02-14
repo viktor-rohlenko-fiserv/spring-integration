@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,8 +53,11 @@ public class NatsInboundGateway extends MessagingGatewaySupport implements Order
 	private final NatsTemplate natsTemplate;
 
 	private final NatsCoreMessageHandler natsCoreMessageHandler = new NatsCoreMessageHandler();
+
 	private final MessageConverter messageConverter;
+
 	private boolean extractRequestPayload = true;
+
 	private boolean extractReplyPayload = true;
 
 	public NatsInboundGateway(
