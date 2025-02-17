@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,11 +86,17 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 public class NatsMessageAsyncProducingHandlerManualTest extends AbstractNatsIntegrationTestSupport {
 
 	public static final int MAX_REDELIVER = 3;
+
 	private static final Log LOG = LogFactory.getLog(NatsMessageAsyncProducingHandlerTest.class);
+
 	private static final String TEST_SUBJECT = "test-subject";
+
 	private static final String TEST_STREAM = "test-stream";
+
 	private static final String TEST_SUBJECT_CONSUMER = "test-subject-consumer";
+
 	public static HashMap<String, Integer> messagesSent = new HashMap<>();
+
 	public static HashMap<String, Integer> messagesRecCount = new HashMap<>();
 
 	public static HashMap<String, NatsJetStreamMetaData> messagesReceived = new HashMap<>();
@@ -379,13 +385,16 @@ public class NatsMessageAsyncProducingHandlerManualTest extends AbstractNatsInte
 	}
 
 	class SecondsCounter extends TimerTask {
+
 		private final String name;
+
 		private int countSec;
 
 		SecondsCounter(String name) {
 			this.name = name;
 			LOG.info("Task: " + name);
 		}
+
 		public void run() {
 			LOG.info("Already waiting for " + countSec + " seconds.");
 			countSec++;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,14 +65,17 @@ public class NatsContainerTest {
 					.data("Hello_1".getBytes())
 					.subject("validSubjectForPullSubscription")
 					.build();
+
 	private final Message natsMessage2 =
 			NatsMessage.builder()
 					.data("Hello_2".getBytes())
 					.subject("validSubjectForPullSubscription")
 					.build();
-	private final ConsumerProperties consumerProperties =
-			new ConsumerProperties("validStream", "validSubject", "valid-consumer", "valid-group");
+
+	private final ConsumerProperties consumerProperties = new ConsumerProperties("validStream", "validSubject", "valid-consumer", "valid-group");
+
 	private Connection natsConnection;
+
 	private JetStream jetStreamContext;
 
 	@Before
