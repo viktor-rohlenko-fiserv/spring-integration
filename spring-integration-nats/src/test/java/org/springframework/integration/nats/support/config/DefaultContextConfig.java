@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,10 +61,15 @@ import org.springframework.stereotype.Repository;
 public class DefaultContextConfig extends AbstractNatsIntegrationTestSupport {
 
 	public static final String TEST_SUBJECT = "test-subject";
+
 	public static final String TEST_STREAM = "test-stream";
+
 	public static final String TEST_SUBJECT_CONSUMER = "test-subject-consumer";
+
 	public static final int MAX_REDELIVER = 3;
+
 	public static final Log LOG = LogFactory.getLog(NatsSpringIntegrationScatterGatherTest.class);
+
 	@Autowired
 	private Connection natsConnection;
 

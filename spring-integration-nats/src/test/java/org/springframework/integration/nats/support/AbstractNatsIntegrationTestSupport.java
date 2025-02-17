@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,15 +68,17 @@ public abstract class AbstractNatsIntegrationTestSupport {
 
 	// System property to disable/enable jetstream for testing ( Default
 	// enabled)
-	private static final boolean jetStreamEnabled =
-			Boolean.valueOf(System.getProperty("nats_js_enabled", "true"));
+	private static final boolean jetStreamEnabled = Boolean.valueOf(System.getProperty("nats_js_enabled", "true"));
+
 	private static final String tlsConfPath = "src/test/resources/tls.conf";
-	private static final String tlsConfPathWithOutJS =
-			"src/test/resources/tls_without_jetstream.conf";
-	private static String natsServerURL =
-			"nats://localhost:4222,nats://localhost:4223,nats://localhost:4224";
+
+	private static final String tlsConfPathWithOutJS = "src/test/resources/tls_without_jetstream.conf";
+
+	private static String natsServerURL = "nats://localhost:4222,nats://localhost:4223,nats://localhost:4224";
+
 	// DOCKER server
 	private static GenericContainer natsDocker;
+
 	// NATS local server
 	private static NatsLocalTestServer natsLocal;
 
