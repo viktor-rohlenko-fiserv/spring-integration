@@ -862,6 +862,45 @@ project('spring-integration-nats') {
         exclude('/org/springframework/integration/nats/NatsMessageAsyncProducingHandlerTest.class')
         exclude('/org/springframework/integration/nats/NatsInboundAdapterResiliencyTest.class')
     }
+
+    // Task to check if Docker is running
+    tasks.register('checkDockerStatus') {
+        doFirst {
+
+            def isDockerRunning = false
+
+            println "checkDockerStatus is running. isDockerRunning = $isDockerRunning"
+
+            try {
+                def process = "docker info".execute() // Execute the Docker info command
+                process.waitFor()
+
+                if (process.exitValue() != 0) {
+                    isDockerRunning = false
+                }
+                else
+                {
+                    isDockerRunning = true
+                }
+            } catch (Exception e) {
+                isDockerRunning = false
+            }
+
+            println "checkDockerStatus is running. isDockerRunning = $isDockerRunning"
+
+            // Enable tests if Docker is running
+            if (isDockerRunning) {
+                println 'Docker is running. Tests will be executed.'
+            } else {
+                test.enabled = false
+                println 'Docker is not running. Tests will be skipped.'
+            }
+        }
+    }
+
+    // Ensure checkDockerStatus runs before the test task
+    tasks.test.dependsOn checkDockerStatus
+
 }
 
 project('spring-integration-redis') {
