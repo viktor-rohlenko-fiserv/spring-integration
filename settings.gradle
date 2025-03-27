@@ -1,5 +1,18 @@
 pluginManagement {
 	repositories {
+
+		maven {
+			url "https://nexus-emea.1dc.com/repository/packages-nuxeo-com-maven-public"
+		}
+		maven {
+			url 'https://nexus-emea.1dc.com/repository/jcenter-bintray-com'
+		}
+		maven {
+			url 'https://nexus-emea.1dc.com/repository/gradle-plugin-mirror'
+	 	}
+		maven {
+			url "https://nexus-emea.1dc.com/repository/de-esolutions-public/"
+		}
 		gradlePluginPortal()
 		mavenCentral()
 	}
