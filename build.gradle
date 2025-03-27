@@ -2,10 +2,22 @@ buildscript {
     ext.kotlinVersion = '1.9.25'
     ext.isCI = System.getenv('GITHUB_ACTION')
     repositories {
+        maven {
+            url "https://nexus-emea.1dc.com/repository/packages-nuxeo-com-maven-public"
+        }
+        maven {
+            url 'https://nexus-emea.1dc.com/repository/jcenter-bintray-com'
+        }
+       maven {
+            url 'https://nexus-emea.1dc.com/repository/gradle-plugin-mirror'
+        }
+        maven {
+            url "https://nexus-emea.1dc.com/repository/de-esolutions-public/"
+        }
         gradlePluginPortal()
         mavenCentral()
         if (version.endsWith('SNAPSHOT')) {
-            maven { url 'https://repo.spring.io/snapshot' }
+            maven { url 'https://nexus-emea.1dc.com/repository/repo-spring-io-snapshot' }
         }
     }
     dependencies {
@@ -133,10 +145,22 @@ allprojects {
         if (project.hasProperty('mavenLocal')) {
             mavenLocal()
         }
+        maven {
+            url "https://nexus-emea.1dc.com/repository/packages-nuxeo-com-maven-public"
+        }
+        maven {
+            url 'https://nexus-emea.1dc.com/repository/jcenter-bintray-com'
+        }
+        maven {
+            url 'https://nexus-emea.1dc.com/repository/gradle-plugin-mirror'
+        }
+        maven {
+            url "https://nexus-emea.1dc.com/repository/de-esolutions-public/"
+        }
         mavenCentral()
         maven { url 'https://repo.spring.io/milestone' }
         if (version.endsWith('SNAPSHOT')) {
-            maven { url 'https://repo.spring.io/snapshot' }
+            maven { url 'https://nexus-emea.1dc.com/repository/repo-spring-io-snapshot' }
         }
 //		maven { url 'https://repo.spring.io/libs-staging-local' }
     }
